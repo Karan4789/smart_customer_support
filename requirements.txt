@@ -1,0 +1,19 @@
+# requirements.txt
+
+# Core web framework and server
+fastapi
+uvicorn[standard]
+
+# Utilities
+python-dotenv
+
+# Google APIs
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
+
+# HTTP requests
+requests
+
+# AI and Machine Learning
+google-generativeai
