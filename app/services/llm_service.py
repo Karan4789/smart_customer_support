@@ -1,28 +1,43 @@
 # app/services/llm_service.py
 import google.generativeai as genai
 from app.config import config
-from app.services.llm_parsing_utils import parse_llm_json_response # Import the new function
+from app.services.llm_parsing_utils import parse_llm_json_response
 
 genai.configure(api_key=config.GEMINI_API_KEY)
 
-def analyze_and_craft_reply(email_content: str):
+def analyze_and_decide_action(email_content: str):
     """
-    Analyzes email content using Gemini and uses a robust parser for the response.
+    Analyzes email content, decides on an action (reply or create ticket),
+    and generates the necessary content for that action.
     """
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    # Using a newer model for better instruction following
+    model = genai.GenerativeModel('gemini-2.5-flash') 
     
     prompt = f"""
-    Analyze the following customer email. Assess its urgency and generate a polite, professional reply.
-    - If the email mentions 'urgent', 'payment failed', 'error', or 'cannot access', classify priority as 'High'.
-    - Otherwise, classify priority as 'Normal'.
-    
-    Based on the priority, craft a response. 
-    - For 'High' priority, the response should be empathetic and promise a quick follow-up.
-    - For 'Normal' priority, the response should be helpful and set a realistic expectation for a response time (e.g., within 24 hours).
-    
-    Your response must be ONLY a valid JSON object with two keys: "priority" and "reply_body".
+    Analyze the following customer email and decide on the correct course of action.
 
-    Email: "{email_content}"
+    **Step 1: Categorize Priority**
+    - If the email mentions 'urgent', 'payment failed', 'error', 'cannot access', 'broken', or 'not working', classify priority as 'High'.
+    - Otherwise, classify priority as 'Normal'.
+
+    **Step 2: Decide Action**
+    - If priority is 'High', the action should be 'CREATE_TICKET'.
+    - If priority is 'Normal' and it's a simple question (e.g., asking about features, pricing), the action should be 'SEND_REPLY'.
+    - If priority is 'Normal' but the query is vague or seems to describe a problem, the action should be 'CREATE_TICKET'.
+
+    **Step 3: Generate Content**
+    - **summary:** Create a short, one-line summary of the user's issue. This will be the Jira ticket title.
+    - **reply_body:** Craft a polite, professional reply.
+        - If action is 'CREATE_TICKET', the reply should be an acknowledgement that a support ticket has been created and the team will look into it.
+        - If action is 'SEND_REPLY', the reply should directly answer the user's question if possible, or provide helpful information.
+
+    **Step 4: Format Output**
+    Your response must be ONLY a valid JSON object with four keys: "priority", "action", "summary", and "reply_body".
+
+    **Email to Analyze:**
+    ---
+    {email_content}
+    ---
     """
     
     try:
@@ -41,3 +56,4 @@ def analyze_and_craft_reply(email_content: str):
     except Exception as e:
         print(f"An error occurred in LLM service: {e}")
         return None
+

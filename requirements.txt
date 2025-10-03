@@ -17,3 +17,7 @@ requests
 
 # AI and Machine Learning
 google-generativeai
+
+# Jira integration
+jira[cli]
+jira
