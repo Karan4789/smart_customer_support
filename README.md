@@ -1,6 +1,6 @@
 # Smart Customer Support Automation
 
-An **AI-powered application** that monitors a Gmail inbox, analyzes incoming emails using **Google’s Gemini Pro**, and automates responses or creates Jira tickets based on the email’s content and priority.
+An **AI-powered application** that monitors a Gmail inbox, analyzes incoming emails using **Google’s Gemini 2.5 Flash**, and automates responses or creates Jira tickets based on the email’s content and priority.
 
 This system is built with **Python**, **FastAPI**, and integrates seamlessly with **Google** and **Atlassian APIs** to create a fully automated support workflow.
 
