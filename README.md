@@ -24,8 +24,9 @@ This system is built with **Python**, **FastAPI**, and integrates seamlessly wit
 The system identifies high-priority emails and automatically creates detailed tickets on the Jira board.  
 ![Jira Ticket Creation](assets/jira_op1.png)
 
-Each ticket contains the full context, including the original customer message and an AI-suggested reply, ready for a human agent.  
+Each ticket contains the full context, including the original customer message   
 ![Jira Ticket Details](assets/jira_op2.png)
+an AI-suggested reply, ready for a human agent.
 ![Jira Ticket Details](assets/jira_op3.png)
 ---
 
