@@ -26,7 +26,7 @@ The system identifies high-priority emails and automatically creates detailed ti
 
 Each ticket contains the full context, including the original customer message and an AI-suggested reply, ready for a human agent.  
 ![Jira Ticket Details](assets/jira_op2.png)
-
+![Jira Ticket Details](assets/jira_op3.png)
 ---
 
 1. The system continuously monitors a Gmail inbox.  
