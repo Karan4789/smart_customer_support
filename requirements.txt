@@ -21,3 +21,9 @@ google-generativeai
 # Jira integration
 jira[cli]
 jira
+
+#discord bot
+discord.py
+
+#telegram bot
+python-telegram-bot
