@@ -1020,6 +1020,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/f6/d5/4861816a95b2f6993f1360cfb605aacb015506ee2090433a71de9cca8477/langchain-0.3.27-py3-none-any.whl", hash = "sha256:7b20c4f338826acb148d885b20a73a16e410ede9ee4f19bb02011852d5f98798", size = 1018194, upload-time = "2025-07-24T14:42:30.23Z" },
 ]
 
+[package.optional-dependencies]
+google-genai = [
+    { name = "langchain-google-genai" },
+]
+
 [[package]]
 name = "langchain-community"
 version = "0.3.31"
@@ -1779,7 +1784,7 @@ dependencies = [
     { name = "google-auth-oauthlib" },
     { name = "google-generativeai" },
     { name = "jira", extra = ["cli"] },
-    { name = "langchain" },
+    { name = "langchain", extra = ["google-genai"] },
     { name = "langchain-community" },
     { name = "langchain-discord" },
     { name = "langchain-google-community", extra = ["gmail"] },
@@ -1800,7 +1805,7 @@ requires-dist = [
     { name = "google-auth-oauthlib", specifier = ">=1.2.2" },
     { name = "google-generativeai", specifier = ">=0.8.5" },
     { name = "jira", extras = ["cli"], specifier = ">=3.10.5" },
-    { name = "langchain", specifier = ">=0.3.27" },
+    { name = "langchain", extras = ["google-genai"], specifier = ">=0.3.27" },
     { name = "langchain-community", specifier = ">=0.3.31" },
     { name = "langchain-discord", specifier = ">=1.0.2" },
     { name = "langchain-google-community", extras = ["gmail"], specifier = ">=2.0.10" },

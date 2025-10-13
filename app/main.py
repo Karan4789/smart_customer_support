@@ -4,7 +4,8 @@ import asyncio
 from typing import Dict
 
 # Import all the required services
-from app.services import gmail_service, llm_service, jira_service, discord_service
+from app.agents import gmail_agent
+from app.services import llm_service, jira_service, discord_service
 from app.utils.logger import setup_logging
 
 # Setup a central logger and a shared queue for all incoming requests
@@ -18,7 +19,7 @@ async def gmail_listener():
     while True:
         try:
             logger.info("[GMAIL LISTENER] Checking for new emails...")
-            email_data = await asyncio.to_thread(gmail_service.get_latest_unread_email)
+            email_data = await asyncio.to_thread(gmail_agent.get_latest_unread_email)
             
             if email_data:
                 # Normalize the email data into the standard format
@@ -80,7 +81,7 @@ async def process_support_queue():
                     ack_body = f"Hello, thank you for reaching out. A support ticket has been created for your issue. Your Ticket ID is: **{ticket_key}**."
                     if request_data['source'] == 'Gmail':
                         await asyncio.to_thread(
-                            gmail_service.send_reply,
+                            gmail_agent.send_reply,
                             to_email=request_data['sender'],
                             subject=f"Support Ticket Created: {ticket_key}",
                             message_text=ack_body
@@ -96,7 +97,7 @@ async def process_support_queue():
                 # Send the reply back to the correct channel
                 if request_data['source'] == 'Gmail':
                     await asyncio.to_thread(
-                        gmail_service.send_reply,
+                        gmail_agent.send_reply,
                         to_email=request_data['sender'],
                         subject=f"Re: {request_data.get('subject', 'Your recent query')}",
                         message_text=analysis['reply_body']
