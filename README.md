@@ -1,131 +1,147 @@
 # Smart Customer Support Automation
 
-An **AI-powered application** that monitors a Gmail inbox, analyzes incoming emails using **Google’s Gemini 2.5 Flash**, and automates responses or creates Jira tickets based on the email’s content and priority.
+An **AI-powered, multi-agent application** that automates customer support workflows. This system uses a **Scout Agent** to monitor a Gmail inbox, a **Triage Agent** to analyze and decide on actions, and an **Orchestrator** to execute tasks like creating Jira tickets or sending replies.
 
-This system is built with **Python**, **FastAPI**, and integrates seamlessly with **Google** and **Atlassian APIs** to create a fully automated support workflow.
+Built with **Python**, **FastAPI**, and **LangChain**, this project demonstrates a robust, scalable producer-consumer architecture for handling real-world support automation.
+
+---
+
+## 🏛️ Architecture
+
+The system uses a queue-based, multi-agent workflow to decouple tasks and ensure reliable processing.
+
+```
+┌──────────────────────┐      ┌─────────────────┐      ┌───────────────────┐
+│                      │      │                 │      │                   │
+│  Gmail Scout Agent   ├─────►│  Support Queue  ├─────►│  Orchestrator     │
+│  (Finds new emails)  │      │ (FIFO Buffer)   │      │  (Processes items)│
+│                      │      │                 │      │                   │
+└──────────────────────┘      └─────────────────┘      └─────────┬─────────┘
+                                                                │
+                                           ┌────────────────────▼───────────────────┐
+                                           │                                        │
+                                           │  1. Use Triage Agent to make decision  │
+                                           │  2. Execute decision with Tools        │
+                                           │                                        │
+                                           └────────────────────┬───────────────────┘
+                                                                │
+                                     ┌──────────────────────────┴──────────────────────────┐
+                                     │                                                     │
+                             ┌───────▼───────┐                                     ┌───────▼───────┐
+                             │               │                                     │               │
+                             │ Jira Tool     │                                     │ Reply Tool    │
+                             │(Create Ticket)│                                     │(Send Email)   │
+                             │               │                                     │               │
+                             └───────────────┘                                     └───────────────┘
+```
 
 ---
 
 ## 🚀 Features
 
-- **Automated Email Monitoring**: Continuously checks a specified Gmail inbox for new, unread emails.  
-- **Intelligent Analysis**: Uses Google Gemini Pro to analyze email content, determine priority (High/Normal), and decide on the next best action (`SEND_REPLY` or `CREATE_TICKET`).  
-- **Conditional Actions**:  
-  - **Direct Replies**: For low-priority or simple questions, automatically sends a helpful, AI-generated reply.  
-  - **Jira Escalation**: For high-priority or complex issues, automatically creates a detailed ticket in Jira.  
-- **Context-Rich Tickets**: Populates Jira tickets with the customer’s original message, AI-determined priority, and a suggested reply for human agents.  
-- **Customer Acknowledgement**: Sends an automated email with the Jira ticket ID after successful creation.  
-- **Robust Logging**: Logs all major actions, successes, and errors to console and `support_app.log` for monitoring and debugging.  
+-   **Agentic Workflow**: Utilizes specialized LangChain agents for distinct tasks: a `Scout Agent` for discovery and a `Triage Agent` for decision-making.
+-   **Intelligent Triage**: The Triage Agent analyzes email content to determine priority (`High`, `Normal`) and the best action (`CREATE_TICKET` or `SEND_REPLY`).
+-   **Tool-Based Execution**: The orchestrator uses specific, reliable tools to interact with external services like Jira and Gmail, ensuring predictable outcomes.
+-   **AI-Generated Acknowledgments**: For ticket creation, a separate LLM call generates a context-aware, empathetic acknowledgment email for the customer.
+-   **Scalable Queue System**: Built on an async queue, allowing the system to handle backpressure and be easily extended with new channels (e.g., Discord, Telegram).
+-   **Robust Logging**: Logs all agent actions, orchestrator decisions, and errors to both the console and a persistent `app.log` file.
 
 ---
 
-## ⚙️ How It Works
+## ✨ Showcase: Jira Integration
 
-The system identifies high-priority emails and automatically creates detailed tickets on the Jira board.  
+The system identifies high-priority emails and automatically creates detailed tickets on the Jira board.
 ![Jira Ticket Creation](assets/jira_op1.png)
 
-Each ticket contains the full context, including:  
-
-- Original customer message  
+Each ticket contains the full context needed for a human agent to take over, including the original customer message.
 ![Jira Ticket Details](assets/jira_op2.png)
 
-- AI-suggested reply, ready for a human agent  
+For tickets requiring a human touch, the system can even suggest a reply, which can be included in the ticket description.
 ![Jira Ticket Details](assets/jira_op3.png)
-
----
-
-1. The system continuously monitors a Gmail inbox.  
-2. Each new email is analyzed by **Gemini 2.5 flash**:  
-   - If it’s **low-priority / simple** → sends an AI-generated reply.  
-   - If it’s **high-priority / complex** → creates a Jira ticket and sends an acknowledgement email.  
-3. Created Jira tickets contain:  
-   - Original customer message  
-   - AI-suggested reply  
-   - Priority level  
 
 ---
 
 ## 🛠 Tech Stack
 
-- **Backend**: Python , FastAPI
-- **AI/LLM**: Google Gemini 2.5 Flash 
-- **Email**: Gmail API  
-- **Project Management**: Jira API  
-- **Libraries**:  
-  - `google-api-python-client`
-  - `google-auth-httplib2`
-  - `google-auth-oauthlib`
-  - `requests`
-  - `fastapi`
-  - `uvicorn[standard]`  
-  - `jira`  
-  - `python-dotenv`  
+-   **Backend**: Python, FastAPI, Uvicorn
+-   **Agent Framework**: LangChain, LangChain Agents
+-   **AI / LLM**: Google Gemini 2.5 Flash (via `langchain-google-genai`)
+-   **Integrations & Tools**:
+    -   **Gmail**: `langchain-google-community[gmail]` for the Scout Agent's tools.
+    -   **Jira**: `jira` library for the ticket creation tool.
+    -   **Discord**: `discord.py` for potential future channel integration.
 
 ---
 
 ## 📦 Setup and Installation
 
 ### 1. Clone the Repository
+
 ```bash
 git clone <your-repository-url>
-cd <your-repository-name>
+cd smart-customer-support
 ```
 
 ### 2. Create and Activate a Virtual Environment
+
 ```bash
-# Create venv
-python -m venv venv  
+# Create a virtual environment
+python -m venv venv
 
-# Activate (MacOS/Linux)
-source venv/bin/activate  
-
-# Activate (Windows)
+# Activate on Windows
 .\venv\Scripts\activate
+
+# Activate on macOS/Linux
+source venv/bin/activate
 ```
 
 ### 3. Install Dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
 ### 4. Configure Credentials
 
-- **Google API**:  
-  - Follow Google Cloud steps to create an **OAuth 2.0 Client ID**.  
-  - Download `credentials.json` and place it in the project root.  
+-   **Google API**:
+    -   Follow the Google Cloud documentation to create an **OAuth 2.0 Client ID**.
+    -   Download the `credentials.json` file and place it in the project's root directory.
+-   **Environment Variables**:
+    -   Create a `.env` file in the root directory.
+    -   Copy and paste the following, filling in your own secret values.
 
-- **Environment Variables**:  
-  - Create a `.env` file in the root directory with:  
-    ```text
+    ```env
+    # .env
+
+    # Google
+    GMAIL_CREDENTIALS_PATH=credentials.json
     GEMINI_API_KEY="your_gemini_api_key"
 
-    # Jira Credentials
-    JIRA_DOMAIN="your-domain.atlassian.net"
-    JIRA_EMAIL="your-jira-login-email@example.com"
+    # Jira
     JIRA_API_TOKEN="your_jira_api_token"
+    JIRA_EMAIL="your-jira-login-email@example.com"
+    JIRA_DOMAIN="your-domain.atlassian.net"
     JIRA_PROJECT_KEY="YOUR_PROJECT_KEY"
+
+    # Discord (for future use)
+    DISCORD_BOT_TOKEN="your_discord_bot_token"
+    DISCORD_SUPPORT_CHANNEL_ID="your_discord_channel_id"
     ```
-  - A `token.json` file will be auto-created on first run for Gmail authentication.  
+
+-   **Gmail Token**: A `token.json` file will be automatically created in the root directory the first time you run the application, after you complete the browser-based authentication flow.
 
 ---
 
 ## ▶️ Running the Application
 
-Run with Uvicorn:  
+Start the FastAPI server with Uvicorn. The `--reload` flag will automatically restart the server when you make code changes.
+
 ```bash
 uvicorn app.main:app --reload
 ```
 
-- The app will start.  
-- Background task begins monitoring your Gmail inbox.  
-- Actions (reply or ticket creation) are logged in console and `app.log`.  
+Once running, the application will:
+1.  Start the FastAPI server on `http://127.0.0.1:8000`.
+2.  Launch the background tasks for the `gmail_listener` and `orchestrator`.
+3.  Begin logging all activities to the console and `app.log`.
 
----
-
-## 📖 Example Flow
-
-- **Email:** “How do I reset my password?”  
-  → AI categorizes as *simple query* → Auto reply sent.  
-
-- **Email:** “Payment deducted but account not upgraded.”  
-  → AI categorizes as *High Priority Billing* → Jira ticket created + Acknowledgement email sent.  
