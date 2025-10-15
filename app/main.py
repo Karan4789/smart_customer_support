@@ -1,142 +1,153 @@
-from fastapi import FastAPI
-from contextlib import asynccontextmanager
-import asyncio
-from typing import Dict
+# main.py
 
-# Import all the required services
-from app.agents import gmail_agent
-from app.services import llm_service, jira_service, discord_service
+import asyncio
+import json
+from contextlib import asynccontextmanager
+from typing import Dict
+import json, re
+from fastapi import FastAPI
+
+# --- AGENT AND TOOL IMPORTS ---
+# We import the agent executors and the specific tools, NOT the underlying services.
+from app.agents.gmail_agent import agent_executor as gmail_scout_executor
+from app.agents.triage_agent import agent_executor as triage_agent_executor
+from app.agents.tools.jira_tools import create_jira_ticket_tool
+from app.agents.tools.reply_tools import send_email_tool 
+from app.utils.jsonextract import extract_json_object
 from app.utils.logger import setup_logging
 
-# Setup a central logger and a shared queue for all incoming requests
+
+# --- Setup Logging and Queues ---
 logger = setup_logging()
 support_queue = asyncio.Queue()
 
-# --- Listener Tasks ---
+# --- Listener Task (Agent-driven) ---
 
 async def gmail_listener():
-    """A dedicated background task that polls Gmail for new emails."""
+    """A background task that runs the Gmail Scout Agent to find and queue new emails."""
     while True:
         try:
-            logger.info("[GMAIL LISTENER] Checking for new emails...")
-            email_data = await asyncio.to_thread(gmail_agent.get_latest_unread_email)
+            logger.info("[GMAIL LISTENER] Running Scout Agent to find new emails...")
             
-            if email_data:
-                # Normalize the email data into the standard format
-                normalized_message = {
-                    "source": "Gmail",
-                    "sender": email_data['sender'],
-                    "message": email_data['content'],
-                    "subject": email_data.get('subject', 'No Subject'),
-                    "timestamp": asyncio.get_event_loop().time()
-                }
-                # Put the normalized message into the central queue
-                await support_queue.put(normalized_message)
-                logger.info(f"[GMAIL LISTENER] Queued new support request from: {email_data['sender']}")
-        except Exception as e:
-            logger.critical(f"[GMAIL LISTENER] Error: {e}", exc_info=True)
-        
-        # Wait before checking again
-        await asyncio.sleep(60)
-
-# --- Processor Task ---
-
-async def process_support_queue():
-    """The primary background task that processes all items from the central queue."""
-    while True:
-        try:
-            # Wait for a new request to appear in the queue
-            request_data = await support_queue.get()
+            # The high-level task for the scout agent
+            task = """
+            Search for the single most recent unread email in the inbox.
+            If found, get its message ID, sender, subject, and plain text body.
+            Format the output as a JSON object with keys: "message_id", "sender", "subject", and "body".
+            """
             
-            logger.info(f"[PROCESSOR] Dequeued new request from source: {request_data['source']}")
+            result = await asyncio.to_thread(gmail_scout_executor.invoke, {"input": task})
+            email_json_str = result.get("output", "")
 
-            # Analyze the request with the LLM (this logic is the same for all sources)
-            logger.info("[PROCESSOR] Analyzing request with LLM...")
-            analysis = await asyncio.to_thread(llm_service.analyze_and_decide_action, request_data['message'])
-            
-            if not analysis or not all(k in analysis for k in ['priority', 'action', 'summary', 'reply_body']):
-                logger.error("[PROCESSOR] LLM analysis failed or returned invalid data.")
-                support_queue.task_done()
+            email_data = extract_json_object(email_json_str)
+            if not email_data:
+                logger.warning("[GMAIL LISTENER] Agent returned non-JSON output; skipping this cycle.")
+                await asyncio.sleep(15)
                 continue
 
-            logger.info(f"[PROCESSOR] LLM analysis complete. Priority: {analysis['priority']}, Action: {analysis['action']}")
+            email_data["source"] = "Gmail"
+            await support_queue.put(email_data)
 
-            # Execute the action recommended by the LLM
-            if analysis['action'] == 'CREATE_TICKET':
-                ticket_description = (
-                    f"A new support request has been logged.\n\n"
-                    f"**Customer:** {request_data['sender']}\n"
-                    f"**Source:** {request_data['source']}\n"
-                    f"**Priority:** {analysis['priority']}\n\n"
-                    f"--- Customer's Original Message ---\n{request_data['message']}\n\n"
-                    f"--- AI-Suggested Reply ---\n{analysis['reply_body']}"
+        except Exception as e:
+            logger.critical(f"[GMAIL LISTENER] Critical error: {e}", exc_info=True)
+        
+        await asyncio.sleep(60)
+
+# --- Orchestrator Task (The "Agent Flow") ---
+
+async def orchestrator_task():
+    """Takes items from the queue, runs the Triage Agent, and dispatches to the correct tool."""
+    while True:
+        try:
+            request_data = await support_queue.get()
+            logger.info(f"[ORCHESTRATOR] Dequeued request from: {request_data['source']}")
+
+            # Step 1: Run Triage Agent to get a decision
+            triage_task = f"""
+            Analyze this email and respond with a JSON object containing these keys:
+            "priority", "action" ("CREATE_TICKET" or "SEND_REPLY"), "summary", "reply_body".
+            Do not include any conversational text.
+            Email: {json.dumps(request_data)}
+            """
+            result = await asyncio.to_thread(triage_agent_executor.invoke, {"input": triage_task})
+            decision = extract_json_object(result.get("output", ""))
+            if not decision or not all(k in decision for k in ("priority","action","summary","reply_body")):
+                logger.error("[ORCHESTRATOR] Invalid triage JSON. Raw: %s", result.get("output"))
+                support_queue.task_done()
+                continue
+            logger.info(f"[ORCHESTRATOR] Triage decision: {decision}")
+
+            # Step 2: Dispatch to the correct TOOL based on the agent's decision
+            action = decision.get("action")
+            
+            if action == "CREATE_TICKET":
+                logger.info("[ORCHESTRATOR] Action: CREATE_TICKET. Invoking Jira Tool.")
+                description = (
+                    f"Customer: {request_data.get('sender')}\n\n"
+                    f"Subject: {request_data.get('subject')}\n\n"
+                    f"--- Original Message ---\n{request_data.get('body')}"
                 )
+                
+                # Call the tool's underlying function directly
                 ticket_key = await asyncio.to_thread(
-                    jira_service.create_jira_ticket,
-                    summary=analysis['summary'],
-                    description=ticket_description
+                    create_jira_ticket_tool.func,
+                    summary=decision.get("summary"),
+                    description=description
                 )
+                
                 if ticket_key:
-                    # Send an acknowledgment back to the correct channel
-                    ack_body = f"Hello, thank you for reaching out. A support ticket has been created for your issue. Your Ticket ID is: **{ticket_key}**."
-                    if request_data['source'] == 'Gmail':
-                        await asyncio.to_thread(
-                            gmail_agent.send_reply,
-                            to_email=request_data['sender'],
-                            subject=f"Support Ticket Created: {ticket_key}",
-                            message_text=ack_body
-                        )
-                    elif request_data['source'] == 'Discord':
-                        if 'reply_callback' in request_data:
-                            await request_data['reply_callback'](ack_body)
-                    logger.info("[PROCESSOR] Acknowledgment sent.")
-                else:
-                    logger.error("[PROCESSOR] Failed to create Jira ticket.")
-
-            elif analysis['action'] == 'SEND_REPLY':
-                # Send the reply back to the correct channel
-                if request_data['source'] == 'Gmail':
+                    logger.info(f"[ORCHESTRATOR] Jira Tool success. Ticket: {ticket_key}")
+                    # Send acknowledgment using the Reply Tool
+                    ack_body = f"Thank you for your request. A support ticket has been created with the ID: {ticket_key}"
                     await asyncio.to_thread(
-                        gmail_agent.send_reply,
-                        to_email=request_data['sender'],
-                        subject=f"Re: {request_data.get('subject', 'Your recent query')}",
-                        message_text=analysis['reply_body']
+                        send_email_tool.func,
+                        to=request_data.get('sender'),
+                        subject=f"Support Ticket Created: {ticket_key}",
+                        body=ack_body
                     )
-                elif request_data['source'] == 'Discord':
-                    if 'reply_callback' in request_data:
-                        await request_data['reply_callback'](analysis['reply_body'])
-                logger.info("[PROCESSOR] Direct reply sent.")
+                    logger.info("[ORCHESTRATOR] Sent acknowledgment via Reply Tool.")
+                else:
+                    logger.error("[ORCHESTRATOR] Jira Tool failed to create ticket.")
 
-            # Mark the task as completed in the queue
+            elif action == "SEND_REPLY":
+                logger.info("[ORCHESTRATOR] Action: SEND_REPLY. Invoking Reply Tool.")
+                await asyncio.to_thread(
+                    send_email_tool.func,
+                    to=request_data.get('sender'),
+                    subject=f"Re: {request_data.get('subject')}",
+                    body=decision.get("reply_body")
+                )
+                logger.info("[ORCHESTRATOR] Sent direct reply via Reply Tool.")
+
+            else:
+                logger.warning(f"[ORCHESTRATOR] Unknown action from Triage Agent: {action}")
+
             support_queue.task_done()
 
         except Exception as e:
-            logger.critical(f"[PROCESSOR] Unhandled error in processing loop: {e}", exc_info=True)
+            logger.critical(f"[ORCHESTRATOR] Unhandled error: {e}", exc_info=True)
+
 
 # --- FastAPI Application Setup ---
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Handles application startup and shutdown events."""
-    logger.info("--- Application Starting Up: Launching background tasks... ---")
+    logger.info("--- 🚀 Application Starting Up: Launching Agentic Workflow... ---")
     
-    # Create and start all concurrent tasks
     gmail_task = asyncio.create_task(gmail_listener())
-    processor_task = asyncio.create_task(process_support_queue())
-    # Pass the central queue to the Discord bot when starting it
-    discord_task = asyncio.create_task(discord_service.run_discord_bot(support_queue))
+    orchestrator = asyncio.create_task(orchestrator_task())
 
     yield
     
-    logger.info("--- Application Shutting Down ---")
-    # Cleanly cancel all tasks on shutdown
+    logger.info("--- 🛑 Application Shutting Down ---")
     gmail_task.cancel()
-    processor_task.cancel()
-    discord_task.cancel()
+    orchestrator.cancel()
     await asyncio.sleep(1)
+
 
 app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 def home() -> Dict[str, str]:
-    return {"status": "Multi-Channel Automated Support Service is running."}
+    return {"status": "Multi-Channel AI Support Agent Service is running."}
