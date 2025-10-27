@@ -1,7 +1,9 @@
 # app/services/jira_service.py
 from jira import JIRA
 from app.config import config
+from app.utils.logger import setup_logging
 
+logger = setup_logging()
 
 def _get_jira_client():
     """Initializes and returns a JIRA client instance."""
@@ -13,7 +15,7 @@ def _get_jira_client():
         )
         return jira_client
     except Exception as e:
-        print(f"[ERROR] Failed to connect to Jira: {e}")
+        logger.error(f"[ERROR] Failed to connect to Jira: {e}")
         return None
 
 
@@ -39,8 +41,8 @@ def create_jira_ticket(summary: str, description: str, issue_type: str = "Task")
 
     try:
         new_issue = jira.create_issue(fields=issue_dict)
-        print(f"[SUCCESS] Jira ticket created successfully! Key: {new_issue.key}")
+        logger.info(f"[SUCCESS] Jira ticket created successfully! Key: {new_issue.key}")
         return new_issue.key
     except Exception as e:
-        print(f"[ERROR] Failed to create Jira ticket: {e}")
+        logger.error(f"[ERROR] Failed to create Jira ticket: {e}")
         return None

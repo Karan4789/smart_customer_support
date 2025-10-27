@@ -10,10 +10,14 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
+from app.utils.logger import setup_logging
+
+# --- Setup Logging ---
+logger = setup_logging()
 
 # --- 1. Initial Setup ---
 load_dotenv()
-print("🔑 Loading credentials from .env file...")
+logger.info("🔑 Loading credentials from .env file...")
 
 # Explicitly load Gemini API key
 gemini_api_key = os.getenv("GEMINI_API_KEY")
@@ -21,7 +25,7 @@ if not gemini_api_key:
     raise ValueError("❌ GEMINI_API_KEY not found in .env file.")
 
 # Initialize Gemini model
-print("🚀 Initializing LLM with GEMINI_API_KEY...")
+logger.info("🚀 Initializing LLM with GEMINI_API_KEY...")
 llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
     temperature=0,
@@ -44,10 +48,10 @@ if os.path.exists(token_file):
 # If no (valid) credentials, perform OAuth login
 if not creds or not creds.valid:
     if creds and creds.expired and creds.refresh_token:
-        print("🔄 Refreshing expired credentials...")
+        logger.info("🔄 Refreshing expired credentials...")
         creds.refresh(Request())
     else:
-        print("🔒 No valid credentials found, starting OAuth flow...")
+        logger.info("🔒 No valid credentials found, starting OAuth flow...")
         if not os.path.exists(credentials_file):
             raise FileNotFoundError(
                 f"'{credentials_file}' not found. Cannot start authentication flow."
@@ -58,7 +62,7 @@ if not creds or not creds.valid:
     # Save credentials for next time
     with open(token_file, "w") as token:
         token.write(creds.to_json())
-        print(f"🔑 Credentials saved to {token_file}")
+        logger.info(f"🔑 Credentials saved to {token_file}")
 
 # ✅ Build Gmail service directly (fix for your ImportError)
 gmail_service = build("gmail", "v1", credentials=creds)
@@ -66,20 +70,17 @@ gmail_service = build("gmail", "v1", credentials=creds)
 # Initialize Gmail Toolkit
 gmail_toolkit = GmailToolkit(api_resource=gmail_service)
 tools = gmail_toolkit.get_tools()
-print(f"📬 Agent equipped with {len(tools)} Gmail tools.")
+logger.info(f"📬 Agent equipped with {len(tools)} Gmail tools.")
 
 # --- 3. Create the Agent ---
 prompt = hub.pull("hwchase17/openai-tools-agent")
 agent = create_openai_tools_agent(llm, tools, prompt)
 agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
-print("🤖 Agent created and ready to run.")
-
-# --- 4. Run the Agent ---
-# /agents/gmail_scout_agent.py (Updated run block)
+logger.info("🤖 Agent created and ready to run.")
 
 # --- 4. Run the Agent ---
 if __name__ == "__main__":
-    print("\n📨 --- Running Gmail Scout Agent ---")
+    logger.info("\n📨 --- Running Gmail Scout Agent ---")
 
     # NEW TASK: Ask for specific fields instead of a summary
     task = """
@@ -90,14 +91,12 @@ if __name__ == "__main__":
 
     try:
         result = agent_executor.invoke({"input": task})
-        print("\n✅ --- Agent Run Complete ---")
-        print("📤 Final Output (as structured JSON):")
-        
-        # The agent's output will now be a JSON string that we can use
-        print(result["output"])
+        logger.info("\n✅ --- Agent Run Complete ---")
+        logger.info("📤 Final Output (as structured JSON):")
+        logger.info(result["output"])
 
     except Exception as e:
-        print("\n❌ --- An error occurred ---")
-        print(f"Error details: {e}")
-        print("💡 Tip: Delete 'token.json' to re-authenticate if the token is invalid.")
+        logger.error("\n❌ --- An error occurred ---")
+        logger.error(f"Error details: {e}")
+        logger.info("💡 Tip: Delete 'token.json' to re-authenticate if the token is invalid.")
 

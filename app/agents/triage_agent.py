@@ -6,6 +6,10 @@ from langchain.agents import AgentExecutor, create_openai_tools_agent
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain import hub
 import json
+from app.utils.logger import setup_logging
+
+# --- Setup Logging ---
+logger = setup_logging()
 
 # --- 1. Setup ---
 load_dotenv()
@@ -58,13 +62,13 @@ if __name__ == "__main__":
     Do not include any conversational text, explanations, or markdown formatting like ```
     """
     
-    print("\n🤔 --- Running Triage Agent ---")
+    logger.info("\n🤔 --- Running Triage Agent ---")
     result = agent_executor.invoke({"input": task})
     
-    print("\n✅ --- Triage Complete ---")
-    print("📋 Triage Decision (Raw JSON Output):")
+    logger.info("\n✅ --- Triage Complete ---")
+    logger.info("📋 Triage Decision (Raw JSON Output):")
     
     # We can now confidently parse this output in our orchestrator
     triage_decision = json.loads(result["output"])
     
-    print(json.dumps(triage_decision, indent=2))
+    logger.info(json.dumps(triage_decision, indent=2))
