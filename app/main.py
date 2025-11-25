@@ -55,16 +55,16 @@ async def gmail_listener():
         
 # --- Helper Function for AI Acknowledgment Generation ---
 
-async def generate_ai_acknowledgment(request_data: Dict, ticket_key: str, llm_executor) -> str:
+async def generate_ai_acknowledgment(request_data: Dict, llm_executor) -> str:
     """
     Uses an LLM to generate a high-quality, context-aware acknowledgment email.
     """
-    logger.info(f"[REPLY-GEN] Generating AI acknowledgment for ticket {ticket_key}...")
+    logger.info(f"[REPLY-GEN] Generating AI acknowledgment...")
     
     # Craft a powerful prompt for the LLM
     prompt = f"""
     You are a friendly and professional customer support agent.
-    A customer has sent the following email, and a support ticket has just been created for them.
+    A customer has sent the following email to our support team.
     
     Original Email Subject: "{request_data.get('subject')}"
     Original Email Body:
@@ -72,31 +72,29 @@ async def generate_ai_acknowledgment(request_data: Dict, ticket_key: str, llm_ex
     {request_data.get('body')}
     ---
     
-    The new support ticket ID is: {ticket_key}
-    
     Your task is to write a short, reassuring, and professional email acknowledgment to the customer.
     - Acknowledge their specific issue briefly so they know you've understood.
-    - Clearly provide them with their ticket ID ({ticket_key}).
-    - Let them know that the team will review their issue and get back to them.
-    - Keep the tone helpful and empathetic.
+    - Let them know that the support team has received their request and is actively reviewing it.
+    - Reassure them that they will receive an update soon.
+    - Keep the tone helpful, empathetic, and professional.
+    - DO NOT mention any ticket ID or reference number.
+    - Sign off as "Customer Support Team".
     """
     
     try:
         result = await asyncio.to_thread(llm_executor.invoke, {"input": prompt})
         ai_reply = result.get("output", "")
         
-        # A fallback in case the AI fails
         if not ai_reply:
             logger.warning("[REPLY-GEN] AI failed to generate a reply, using template.")
-            return f"Thank you for your request. A support ticket has been created with the ID: {ticket_key}. Our team will review it shortly."
+            return "Thank you for reaching out. Our support team has received your request and is actively reviewing it. We will get back to you shortly."
             
         logger.info("[REPLY-GEN] Successfully generated AI acknowledgment.")
         return ai_reply
         
     except Exception as e:
         logger.error(f"[REPLY-GEN] Error during AI reply generation: {e}")
-        # Return a safe fallback template on error
-        return f"Thank you for your request. A support ticket has been created for your issue. Your Ticket ID is: {ticket_key}."
+        return "Thank you for reaching out. Our support team has received your request and is actively reviewing it. We will get back to you shortly."
 
 
 # --- Orchestrator Task (The "Agent Flow") ---
@@ -143,15 +141,16 @@ async def orchestrator_task():
                 
                 if ticket_key:
                     logger.info(f"[ORCHESTRATOR] Jira Tool success. Ticket: {ticket_key}")
+                    # Generate AI acknowledgment (without ticket ID)
+                    ack_body = await generate_ai_acknowledgment(request_data, triage_agent_executor)
                     # Send acknowledgment using the Reply Tool
-                    ack_body = await generate_ai_acknowledgment(request_data, ticket_key, triage_agent_executor)
                     await asyncio.to_thread(
                         send_email_tool.func,
                         to=request_data.get('sender'),
-                        subject=f"Support Ticket Created: {ticket_key}",
+                        subject=f"Re: {request_data.get('subject')}",
                         body=ack_body
                     )
-                    logger.info("[ORCHESTRATOR] Sent acknowledgment via Reply Tool.")
+                    logger.info("[ORCHESTRATOR] Sent AI acknowledgment via Reply Tool.")
                 else:
                     logger.error("[ORCHESTRATOR] Jira Tool failed to create ticket.")
 

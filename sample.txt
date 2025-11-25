@@ -1,0 +1,8 @@
+SUB : URGENT: Production API Down - 500 Errors
+
+BODY : Our production environment is currently down. We are seeing 500 internal server errors on all API endpoints starting at 09:00 AM UTC. This is blocking all customer checkouts.
+
+Critical severity. Please investigate immediately.
+
+Regards,
+DevOps Team
