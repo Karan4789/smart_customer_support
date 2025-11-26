@@ -1,54 +1,69 @@
+import asyncio
 import os
-import discord
 from dotenv import load_dotenv
 
-load_dotenv()
-print("Attempting to load credentials from .env file...")
+# Import the service functions to control the bot lifecycle
+from app.services.discord_service import get_bot, stop_bot
 
-DISCORD_BOT_TOKEN = os.getenv('DISCORD_BOT_TOKEN')
-SUPPORT_CHANNEL_ID_STR = os.getenv('DISCORD_SUPPORT_CHANNEL_ID')
+# Import your agent executor
+from app.agents.discord_agent import agent_executor
 
-print(f"  - Found DISCORD_BOT_TOKEN: {'Yes' if DISCORD_BOT_TOKEN else 'NO'}")
-print(f"  - Found DISCORD_SUPPORT_CHANNEL_ID: {SUPPORT_CHANNEL_ID_STR or 'NO'}")
+# Ensure logging is configured so you can see output
+from app.utils.logger import setup_logging
+logger = setup_logging()
 
-if not DISCORD_BOT_TOKEN or not SUPPORT_CHANNEL_ID_STR:
-    print("\nCRITICAL ERROR: Environment variables are missing.")
-else:
+async def test_discord_workflow():
+    print("🚀 Starting Discord Agent Test Script...")
+
+    # 1. Start the Discord Service (Production-like startup)
+    # This launches the background loop that processes the agent's tool calls.
+    print("🔵 Initializing Discord Bot Service...")
+    bot = await get_bot()
+    print(f"✅ Discord Bot Service Started. Logged in as: {bot.user}")
+
+    # 2. Define a test task for the agent
+    # Replace '1234567890' with your ACTUAL testing Channel ID from your .env or config
+    # You can hardcode it here for the test script to be sure.
+    TEST_CHANNEL_ID = os.getenv("DISCORD_SUPPORT_CHANNEL_ID") 
+    
+    if not TEST_CHANNEL_ID:
+        print("❌ Error: DISCORD_SUPPORT_CHANNEL_ID not found in environment variables.")
+        await stop_bot()
+        return
+
+    # Task 1: Send a message
+    print("\n🧪 --- TEST CASE 1: Sending a Message ---")
+    task_send = f"Send a message to Discord channel {TEST_CHANNEL_ID} saying 'Hello! This is a test from the autonomous agent 🤖.'"
+    
     try:
-        SUPPORT_CHANNEL_ID = int(SUPPORT_CHANNEL_ID_STR)
-        
-        intents = discord.Intents.default()
-        intents.messages = True
-        intents.message_content = True
-
-        bot = discord.Client(intents=intents)
-
-        @bot.event
-        async def on_ready():
-            print("\nSUCCESS! Bot has connected to Discord.")
-            print(f"  - Logged in as: {bot.user}")
-            print(f"  - Ready to listen in channel: {SUPPORT_CHANNEL_ID}")
-
-        @bot.event
-        async def on_message(message):
-            # --- THE ULTIMATE DEBUGGING STEP ---
-            # This will run for EVERY message the bot sees, in ANY channel.
-            print(f"\n--- Message Event Fired! ---")
-            print(f"  - Channel Name: #{message.channel}")
-            print(f"  - Channel ID: {message.channel.id}")
-            print(f"  - Expected Channel ID: {SUPPORT_CHANNEL_ID}")
-            print(f"  - Does Channel ID Match?: {message.channel.id == SUPPORT_CHANNEL_ID}")
-            # -----------------------------------
-
-            if message.author == bot.user:
-                return
-            
-            if message.channel.id == SUPPORT_CHANNEL_ID:
-                print("  - ACTION: Responding to message.")
-                await message.channel.send(f"Test successful! I received your message, {message.author.mention}.")
-
-        print("\nStarting bot...")
-        bot.run(DISCORD_BOT_TOKEN)
-
+        # We use ainvoke for async execution
+        response = await agent_executor.ainvoke({"input": task_send})
+        print(f"🤖 Agent Output: {response['output']}")
     except Exception as e:
-        print(f"\nAn unexpected error occurred: {e}")
+        print(f"❌ Error during Send test: {e}")
+
+    # Task 2: Read messages (Optional, verifies read tool)
+    print("\n🧪 --- TEST CASE 2: Reading Messages ---")
+    task_read = f"Read the last 3 messages from Discord channel {TEST_CHANNEL_ID} and summarize them."
+    
+    try:
+        response = await agent_executor.ainvoke({"input": task_read})
+        print(f"🤖 Agent Output: {response['output']}")
+    except Exception as e:
+        print(f"❌ Error during Read test: {e}")
+
+    # 3. Cleanup and Shutdown
+    print("\n🛑 Shutting down Discord Bot Service...")
+    await stop_bot()
+    print("✅ Test Complete. Exiting.")
+
+if __name__ == "__main__":
+    # Load env vars
+    load_dotenv()
+    
+    # Run the async test loop
+    try:
+        asyncio.run(test_discord_workflow())
+    except KeyboardInterrupt:
+        # Handle Ctrl+C gracefully if it hangs
+        print("\nTest interrupted.")
