@@ -6,3 +6,14 @@ Critical severity. Please investigate immediately.
 
 Regards,
 DevOps Team
+
+Normal reply
+
+Subject: Question about API Rate Limits
+
+Hello,
+
+I'm looking at your documentation but I can't find the specific rate limits for the free tier. Could you let me know how many requests I can make per minute?
+
+Thanks,
+Sarah
