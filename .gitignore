@@ -92,3 +92,7 @@ htmlcov/
 .dmypy.json
 dmypy.json
 
+# Database files
+*.db
+*.sqlite
+*.sqlite3

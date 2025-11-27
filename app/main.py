@@ -4,11 +4,9 @@ import asyncio
 import json
 from contextlib import asynccontextmanager
 from typing import Dict
-import json, re
 from fastapi import FastAPI
 
 # --- AGENT AND TOOL IMPORTS ---
-# We import the agent executors and the specific tools, NOT the underlying services.
 from app.agents.gmail_agent import agent_executor as gmail_scout_executor
 from app.agents.triage_agent import agent_executor as triage_agent_executor
 from app.agents.tools.jira_tools import create_jira_ticket_tool
@@ -16,20 +14,20 @@ from app.agents.tools.reply_tools import send_email_tool
 from app.utils.jsonextract import extract_json_object
 from app.utils.logger import setup_logging
 
+# --- DATABASE IMPORTS ---
+from app.database import init_db, add_ticket, get_next_ticket, update_ticket_status
 
-# --- Setup Logging and Queues ---
+# --- Setup Logging ---
 logger = setup_logging()
-support_queue = asyncio.Queue()
 
 # --- Listener Task (Agent-driven) ---
 
 async def gmail_listener():
-    """A background task that runs the Gmail Scout Agent to find and queue new emails."""
+    """A background task that runs the Gmail Scout Agent to find and save new emails to the database."""
     while True:
         try:
             logger.info("[GMAIL LISTENER] Running Scout Agent to find new emails...")
             
-            # The high-level task for the scout agent
             task = """
             Search for the single most recent unread email in the inbox.
             If found, get its message ID, sender, subject, and plain text body.
@@ -45,23 +43,21 @@ async def gmail_listener():
                 await asyncio.sleep(15)
                 continue
 
-            email_data["source"] = "Gmail"
-            await support_queue.put(email_data)
+            # Instead of queue.put(), we save to database
+            await asyncio.to_thread(add_ticket, email_data)
+            logger.info(f"[GMAIL LISTENER] Saved email {email_data.get('message_id')} to database.")
 
         except Exception as e:
             logger.critical(f"[GMAIL LISTENER] Critical error: {e}", exc_info=True)
         
         await asyncio.sleep(60)
-        
+
 # --- Helper Function for AI Acknowledgment Generation ---
 
 async def generate_ai_acknowledgment(request_data: Dict, llm_executor) -> str:
-    """
-    Uses an LLM to generate a high-quality, context-aware acknowledgment email.
-    """
-    logger.info(f"[REPLY-GEN] Generating AI acknowledgment...")
+    """Uses an LLM to generate a high-quality, context-aware acknowledgment email."""
+    logger.info("[REPLY-GEN] Generating AI acknowledgment...")
     
-    # Craft a powerful prompt for the LLM
     prompt = f"""
     You are a friendly and professional customer support agent.
     A customer has sent the following email to our support team.
@@ -96,32 +92,50 @@ async def generate_ai_acknowledgment(request_data: Dict, llm_executor) -> str:
         logger.error(f"[REPLY-GEN] Error during AI reply generation: {e}")
         return "Thank you for reaching out. Our support team has received your request and is actively reviewing it. We will get back to you shortly."
 
-
-# --- Orchestrator Task (The "Agent Flow") ---
+# --- Orchestrator Task (Database Polling Worker) ---
 
 async def orchestrator_task():
-    """Takes items from the queue, runs the Triage Agent, and dispatches to the correct tool."""
+    """Polls the database for pending tickets, runs the Triage Agent, and dispatches actions."""
     while True:
         try:
-            request_data = await support_queue.get()
-            logger.info(f"[ORCHESTRATOR] Dequeued request from: {request_data['source']}")
+            # POLL the database for work
+            ticket = await asyncio.to_thread(get_next_ticket)
+            
+            if not ticket:
+                # No work? Sleep and try again
+                await asyncio.sleep(5)
+                continue
+            
+            logger.info(f"[ORCHESTRATOR] Processing Ticket #{ticket['id']} from {ticket['sender']}")
 
-            # Step 1: Run Triage Agent to get a decision
+            # Prepare the request data from the ticket
+            request_data = {
+                "message_id": ticket['message_id'],
+                "sender": ticket['sender'],
+                "subject": ticket['subject'],
+                "body": ticket['body'],
+                "source": "Gmail"
+            }
+
+            # Step 1: Run Triage Agent
             triage_task = f"""
             Analyze this email and respond with a JSON object containing these keys:
             "priority", "action" ("CREATE_TICKET" or "SEND_REPLY"), "summary", "reply_body".
             Do not include any conversational text.
             Email: {json.dumps(request_data)}
             """
+            
             result = await asyncio.to_thread(triage_agent_executor.invoke, {"input": triage_task})
             decision = extract_json_object(result.get("output", ""))
-            if not decision or not all(k in decision for k in ("priority","action","summary","reply_body")):
-                logger.error("[ORCHESTRATOR] Invalid triage JSON. Raw: %s", result.get("output"))
-                support_queue.task_done()
+            
+            if not decision or not all(k in decision for k in ("priority", "action", "summary", "reply_body")):
+                logger.error(f"[ORCHESTRATOR] Invalid triage JSON for Ticket #{ticket['id']}. Raw: {result.get('output')}")
+                update_ticket_status(ticket['id'], 'FAILED')
                 continue
+                
             logger.info(f"[ORCHESTRATOR] Triage decision: {decision}")
 
-            # Step 2: Dispatch to the correct TOOL based on the agent's decision
+            # Step 2: Dispatch based on action
             action = decision.get("action")
             
             if action == "CREATE_TICKET":
@@ -132,7 +146,6 @@ async def orchestrator_task():
                     f"--- Original Message ---\n{request_data.get('body')}"
                 )
                 
-                # Call the tool's underlying function directly
                 ticket_key = await asyncio.to_thread(
                     create_jira_ticket_tool.func,
                     summary=decision.get("summary"),
@@ -141,9 +154,11 @@ async def orchestrator_task():
                 
                 if ticket_key:
                     logger.info(f"[ORCHESTRATOR] Jira Tool success. Ticket: {ticket_key}")
-                    # Generate AI acknowledgment (without ticket ID)
+                    
+                    # Generate AI acknowledgment
                     ack_body = await generate_ai_acknowledgment(request_data, triage_agent_executor)
-                    # Send acknowledgment using the Reply Tool
+                    
+                    # Send acknowledgment
                     await asyncio.to_thread(
                         send_email_tool.func,
                         to=request_data.get('sender'),
@@ -151,8 +166,12 @@ async def orchestrator_task():
                         body=ack_body
                     )
                     logger.info("[ORCHESTRATOR] Sent AI acknowledgment via Reply Tool.")
+                    
+                    # Mark as COMPLETED in database
+                    update_ticket_status(ticket['id'], 'COMPLETED', triage_result=decision)
                 else:
                     logger.error("[ORCHESTRATOR] Jira Tool failed to create ticket.")
+                    update_ticket_status(ticket['id'], 'FAILED')
 
             elif action == "SEND_REPLY":
                 logger.info("[ORCHESTRATOR] Action: SEND_REPLY. Invoking Reply Tool.")
@@ -163,36 +182,43 @@ async def orchestrator_task():
                     body=decision.get("reply_body")
                 )
                 logger.info("[ORCHESTRATOR] Sent direct reply via Reply Tool.")
+                
+                # Mark as COMPLETED
+                update_ticket_status(ticket['id'], 'COMPLETED', triage_result=decision)
 
             else:
                 logger.warning(f"[ORCHESTRATOR] Unknown action from Triage Agent: {action}")
-
-            support_queue.task_done()
+                update_ticket_status(ticket['id'], 'FAILED')
 
         except Exception as e:
             logger.critical(f"[ORCHESTRATOR] Unhandled error: {e}", exc_info=True)
-
+            if ticket:
+                update_ticket_status(ticket['id'], 'FAILED')
 
 # --- FastAPI Application Setup ---
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Handles application startup and shutdown events."""
-    logger.info("--- 🚀 Application Starting Up: Launching Agentic Workflow... ---")
+    logger.info("--- Application Starting Up: Launching Agentic Workflow with Database Queue ---")
     
+    # Initialize the database
+    init_db()
+    logger.info("[DATABASE] Initialized support_system.db")
+    
+    # Start background tasks
     gmail_task = asyncio.create_task(gmail_listener())
     orchestrator = asyncio.create_task(orchestrator_task())
 
     yield
     
-    logger.info("--- 🛑 Application Shutting Down ---")
+    logger.info("--- Application Shutting Down ---")
     gmail_task.cancel()
     orchestrator.cancel()
     await asyncio.sleep(1)
-
 
 app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 def home() -> Dict[str, str]:
-    return {"status": "Multi-Channel AI Support Agent Service is running."}
+    return {"status": "Multi-Channel AI Support Agent Service is running with persistent database queue."}
