@@ -40,9 +40,7 @@ async def run_discord_agent(task: str):
     """
     print(f"🤖 Discord Agent received task: {task}")
     try:
-        # invoke is synchronous by default in LangChain, but since our tools are async,
-        # we generally wrap this or use ainvoke. For simplicity in this architecture,
-        # we'll rely on the tools' internal async handling or use ainvoke if your LangChain version prefers it.
+        
         result = await agent_executor.ainvoke({"input": task})
         return result["output"]
     except Exception as e:

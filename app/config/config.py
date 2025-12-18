@@ -18,6 +18,9 @@ JIRA_PROJECT_KEY = os.getenv('JIRA_PROJECT_KEY')
 DISCORD_BOT_TOKEN = os.getenv('DISCORD_BOT_TOKEN')
 DISCORD_SUPPORT_CHANNEL_ID = os.getenv('DISCORD_SUPPORT_CHANNEL_ID')
 
+# Telegram credentials
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+
 
 # Add logging config
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
