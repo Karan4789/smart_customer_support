@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <title>NovaCore Solutions | Intelligent Business Systems</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        fontFamily: {
+          sans: ['Inter', 'sans-serif'],
+        },
+        extend: {
+          colors: {
+            primary: '#3b82f6', // Bright Blue
+            secondary: '#8b5cf6', // Violet
+            surface: '#0f172a', // Slate 900
+            card: '#1e293b', // Slate 800
+            dark: '#020617', // Slate 950
+          },
+          animation: {
+            'blob': 'blob 7s infinite',
+            'fade-up': 'fadeUp 0.8s ease-out forwards',
+          },
+          keyframes: {
+            blob: {
+              '0%': { transform: 'translate(0px, 0px) scale(1)' },
+              '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+              '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+              '100%': { transform: 'translate(0px, 0px) scale(1)' },
+            },
+            fadeUp: {
+              '0%': { opacity: '0', transform: 'translateY(20px)' },
+              '100%': { opacity: '1', transform: 'translateY(0)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    /* Grid Background Pattern */
+    .bg-grid {
+      background-size: 40px 40px;
+      background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                        linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    }
+    
+    /* Animation Utility Class */
+    .reveal {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: all 0.8s ease-out;
+    }
+    .reveal.active {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+
+<body class="bg-surface text-slate-300 antialiased overflow-x-hidden relative">
+
+  <!-- Background Glow Effects -->
+  <div class="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+    <div class="absolute top-0 left-1/4 w-96 h-96 bg-primary/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob"></div>
+    <div class="absolute top-0 right-1/4 w-96 h-96 bg-secondary/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob animation-delay-2000"></div>
+  </div>
+
+  <!-- Navbar -->
+  <nav class="fixed w-full z-50 transition-all duration-300 backdrop-blur-md bg-surface/80 border-b border-white/10" id="navbar">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+      <!-- Logo -->
+      <a href="#" class="flex items-center gap-2 group">
+        <div class="w-8 h-8 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg group-hover:shadow-primary/50 transition">
+          N
+        </div>
+        <span class="text-xl font-bold text-white tracking-tight">NovaCore</span>
+      </a>
+
+      <!-- Desktop Links -->
+      <div class="hidden md:flex items-center space-x-8 text-sm font-medium">
+        <a href="#services" class="hover:text-primary transition-colors">Services</a>
+        <a href="#about" class="hover:text-primary transition-colors">About</a>
+        <a href="#support" class="hover:text-primary transition-colors">Support</a>
+        <a href="#support" class="bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-full border border-white/10 transition-all">
+          Contact Us
+        </a>
+      </div>
+
+      <!-- Mobile Menu Button -->
+      <button id="mobileMenuBtn" class="md:hidden text-white focus:outline-none">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Mobile Menu Dropdown -->
+    <div id="mobileMenu" class="hidden md:hidden bg-card border-b border-white/10 absolute w-full">
+      <div class="flex flex-col p-6 space-y-4">
+        <a href="#services" class="text-gray-300 hover:text-primary">Services</a>
+        <a href="#about" class="text-gray-300 hover:text-primary">About</a>
+        <a href="#support" class="text-gray-300 hover:text-primary">Support</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="relative pt-40 pb-24 lg:pt-52 lg:pb-32 overflow-hidden">
+    <div class="absolute inset-0 bg-grid z-0"></div>
+    <div class="relative z-10 max-w-7xl mx-auto px-6 text-center">
+      
+      <div class="inline-flex items-center px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-xs font-semibold tracking-wide uppercase mb-6 animate-fade-up">
+        <span class="w-2 h-2 bg-primary rounded-full mr-2 animate-pulse"></span>
+        System Online v2.0
+      </div>
+
+      <h1 class="text-5xl md:text-7xl font-bold mb-8 text-white tracking-tight leading-tight animate-fade-up" style="animation-delay: 0.1s;">
+        Intelligent Systems for <br class="hidden md:block" />
+        <span class="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">
+          Modern Businesses
+        </span>
+      </h1>
+      
+      <p class="text-lg md:text-xl max-w-2xl mx-auto text-gray-400 mb-10 leading-relaxed animate-fade-up" style="animation-delay: 0.2s;">
+        NovaCore Solutions designs AI-driven platforms that automate operations,
+        monitor performance, and elevate customer experience with surgical precision.
+      </p>
+
+      <div class="flex flex-col md:flex-row justify-center gap-4 animate-fade-up" style="animation-delay: 0.3s;">
+        <a href="#services" class="px-8 py-4 bg-primary hover:bg-blue-600 text-white rounded-lg font-semibold shadow-lg shadow-blue-500/25 transition-all transform hover:-translate-y-1">
+          Explore Solutions
+        </a>
+        <a href="#about" class="px-8 py-4 bg-card border border-white/10 hover:border-white/30 text-white rounded-lg font-semibold transition-all">
+          Learn More
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Services -->
+  <section id="services" class="py-24 relative z-10">
+    <div class="max-w-7xl mx-auto px-6">
+      <div class="text-center mb-16 reveal">
+        <h3 class="text-3xl md:text-4xl font-bold text-white mb-4">What We Build</h3>
+        <p class="text-gray-400 max-w-xl mx-auto">Scalable architecture meets artificial intelligence.</p>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-8">
+        <!-- Card 1 -->
+        <div class="group bg-card/50 backdrop-blur-sm p-8 rounded-2xl border border-white/10 hover:border-primary/50 transition-all duration-300 hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-2 reveal">
+          <div class="w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center mb-6 text-primary group-hover:scale-110 transition-transform">
+            <!-- AI Icon -->
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+          </div>
+          <h4 class="font-bold text-xl mb-3 text-white">AI Automation</h4>
+          <p class="text-gray-400 leading-relaxed">
+            Autonomous agents that handle customer interactions, anomaly detection, and complex workflow execution without human oversight.
+          </p>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="group bg-card/50 backdrop-blur-sm p-8 rounded-2xl border border-white/10 hover:border-secondary/50 transition-all duration-300 hover:shadow-2xl hover:shadow-secondary/10 hover:-translate-y-2 reveal" style="transition-delay: 100ms;">
+          <div class="w-12 h-12 bg-secondary/20 rounded-lg flex items-center justify-center mb-6 text-secondary group-hover:scale-110 transition-transform">
+            <!-- Server Icon -->
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path></svg>
+          </div>
+          <h4 class="font-bold text-xl mb-3 text-white">Backend Systems</h4>
+          <p class="text-gray-400 leading-relaxed">
+            Robust APIs, internal tooling, and elastic cloud architectures built for high availability, security, and extreme scale.
+          </p>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="group bg-card/50 backdrop-blur-sm p-8 rounded-2xl border border-white/10 hover:border-primary/50 transition-all duration-300 hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-2 reveal" style="transition-delay: 200ms;">
+          <div class="w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center mb-6 text-primary group-hover:scale-110 transition-transform">
+            <!-- Analytics Icon -->
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+          </div>
+          <h4 class="font-bold text-xl mb-3 text-white">Real-Time Analytics</h4>
+          <p class="text-gray-400 leading-relaxed">
+            Continuous data pipelines monitoring revenue, inventory, and operational health, visualized in custom dashboards.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- About -->
+  <section id="about" class="py-24 bg-dark relative border-y border-white/5">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="grid md:grid-cols-2 gap-12 items-center">
+        <div class="reveal">
+          <h3 class="text-3xl font-bold mb-6 text-white">Engineered for <br /><span class="text-primary">Reliability</span></h3>
+          <p class="text-gray-400 leading-relaxed mb-6">
+            NovaCore Solutions builds intelligent systems from the ground up.
+            Our platforms combine AI reasoning, backend engineering, and
+            real-time analytics to give businesses full operational visibility.
+          </p>
+          <ul class="space-y-4">
+            <li class="flex items-center text-gray-300">
+              <svg class="w-5 h-5 text-green-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+              99.9% Uptime SLA
+            </li>
+            <li class="flex items-center text-gray-300">
+              <svg class="w-5 h-5 text-green-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+              Enterprise-grade Security
+            </li>
+            <li class="flex items-center text-gray-300">
+              <svg class="w-5 h-5 text-green-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+              24/7 Monitoring
+            </li>
+          </ul>
+        </div>
+        <div class="relative reveal">
+          <div class="absolute -inset-4 bg-gradient-to-r from-primary to-secondary rounded-2xl opacity-20 blur-lg"></div>
+          <div class="relative bg-card p-8 rounded-2xl border border-white/10">
+            <div class="flex justify-between items-end mb-4">
+              <span class="text-gray-400">System Load</span>
+              <span class="text-green-400 font-mono">34%</span>
+            </div>
+            <div class="w-full bg-surface rounded-full h-2 mb-6">
+              <div class="bg-green-500 h-2 rounded-full" style="width: 34%"></div>
+            </div>
+            <div class="flex justify-between items-end mb-4">
+              <span class="text-gray-400">Requests / Sec</span>
+              <span class="text-primary font-mono">1,024</span>
+            </div>
+            <div class="w-full bg-surface rounded-full h-2 mb-6">
+              <div class="bg-primary h-2 rounded-full animate-pulse" style="width: 75%"></div>
+            </div>
+            <div class="flex justify-between items-end mb-4">
+              <span class="text-gray-400">AI Tokens Processed</span>
+              <span class="text-secondary font-mono">8.4M</span>
+            </div>
+            <div class="w-full bg-surface rounded-full h-2">
+              <div class="bg-secondary h-2 rounded-full" style="width: 90%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Support Form -->
+  <section id="support" class="py-24 relative z-10">
+    <div class="max-w-2xl mx-auto px-6">
+      <div class="text-center mb-10 reveal">
+        <h3 class="text-3xl font-bold text-white mb-4">Customer Support</h3>
+        <p class="text-gray-400">Submit your inquiry. Our AI agents process requests instantly.</p>
+      </div>
+
+      <form id="supportForm" class="bg-card/80 backdrop-blur-xl p-8 rounded-2xl border border-white/10 shadow-2xl reveal relative overflow-hidden">
+        <!-- Top decorative line -->
+        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-purple-500 to-secondary"></div>
+
+        <div class="space-y-6 relative z-10">
+          <div>
+            <label class="block mb-2 text-sm font-medium text-gray-400 uppercase tracking-wide">
+              Email Address
+            </label>
+            <input
+              type="email"
+              name="email"
+              required
+              class="w-full bg-surface border border-white/10 rounded-lg px-4 py-3 text-gray-200 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all placeholder-gray-600"
+              placeholder="you@company.com"
+            />
+          </div>
+
+          <div>
+            <label class="block mb-2 text-sm font-medium text-gray-400 uppercase tracking-wide">
+              Message
+            </label>
+            <textarea
+              name="message"
+              required
+              rows="5"
+              class="w-full bg-surface border border-white/10 rounded-lg px-4 py-3 text-gray-200 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all placeholder-gray-600"
+              placeholder="Describe your issue or technical requirements..."
+            ></textarea>
+          </div>
+
+          <button
+            type="submit"
+            class="w-full bg-gradient-to-r from-primary to-blue-600 text-white py-4 rounded-lg font-bold tracking-wide hover:shadow-lg hover:shadow-primary/25 hover:scale-[1.01] transition-all"
+          >
+            Submit
+          </button>
+
+          <p id="formStatus" class="text-center text-sm mt-4 min-h-[20px]"></p>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="bg-dark border-t border-white/5 py-12">
+    <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center text-gray-500 text-sm">
+      <div class="mb-4 md:mb-0">
+        <span class="text-lg font-bold text-white mr-2">NovaCore</span>
+        &copy; 2025 Solutions.
+      </div>
+      <div class="flex space-x-6">
+        <a href="#" class="hover:text-primary transition">Privacy Policy</a>
+        <a href="#" class="hover:text-primary transition">Terms of Service</a>
+        <a href="#" class="hover:text-primary transition">Twitter</a>
+        <a href="#" class="hover:text-primary transition">LinkedIn</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script>
+    // --- Mobile Menu Toggle ---
+    const mobileMenuBtn = document.getElementById("mobileMenuBtn");
+    const mobileMenu = document.getElementById("mobileMenu");
+
+    mobileMenuBtn.addEventListener("click", () => {
+      mobileMenu.classList.toggle("hidden");
+    });
+
+    // --- Form Handling ---
+    const form = document.getElementById("supportForm");
+    const status = document.getElementById("formStatus");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      
+      const btn = form.querySelector('button');
+      const originalText = btn.innerText;
+      btn.innerText = "Processing...";
+      btn.disabled = true;
+
+      const payload = {
+        email: form.email.value,
+        message: form.message.value
+      };
+
+      // Simulating network delay for effect
+      await new Promise(r => setTimeout(r, 1500));
+
+      try {
+        // NOTE: This will fail 404 on a static file, so we catch the error 
+        // and simulate success for the demo.
+        const res = await fetch("/webhooks/support-form", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error("Endpoint not found");
+      } catch (err) {
+        // Simulating success message for the demo
+        console.log("Mock submission:", payload);
+        status.innerHTML = `<span class="flex items-center justify-center text-green-400"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Ticket #8492 created successfully.</span>`;
+        form.reset();
+      } finally {
+        btn.innerText = originalText;
+        btn.disabled = false;
+        setTimeout(() => { status.innerHTML = ""; }, 5000);
+      }
+    });
+
+    // --- Scroll Animations (Intersection Observer) ---
+    const observerOptions = {
+      threshold: 0.1,
+      rootMargin: "0px 0px -50px 0px"
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("active");
+          observer.unobserve(entry.target);
+        }
+      });
+    }, observerOptions);
+
+    document.querySelectorAll(".reveal").forEach(el => {
+      observer.observe(el);
+    });
+  </script>
+
+</body>
+</html>
