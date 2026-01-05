@@ -15,6 +15,7 @@ def init_db():
             sender TEXT,
             subject TEXT,
             body TEXT,
+            source TEXT,
             status TEXT DEFAULT 'PENDING',
             triage_result TEXT,
             created_at TIMESTAMP
@@ -23,28 +24,29 @@ def init_db():
     conn.commit()
     conn.close()
 
-def add_ticket(email_data):
-    """Scout Agent calls this to save a new email."""
+def add_ticket(ticket_data):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     try:
         cursor.execute('''
-            INSERT INTO tickets (message_id, sender, subject, body, status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO tickets (message_id, sender, subject, body, source, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (
-            email_data['message_id'],
-            email_data['sender'],
-            email_data['subject'],
-            email_data['body'],
+            ticket_data['message_id'],
+            ticket_data['sender'],
+            ticket_data['subject'],
+            ticket_data['body'],
+            ticket_data['source'], # No default. Must be provided by the Agent.
             'PENDING',
             datetime.now()
         ))
         conn.commit()
-        print(f"💾 Saved email {email_data['message_id']} to DB.")
-    except sqlite3.IntegrityError:
-        print(f"⚠️ Email {email_data['message_id']} already exists. Skipping.")
+        print(f"💾 Saved ticket {ticket_data['message_id']} ({ticket_data['source']}) to DB.")
+    except Exception as e:
+        print(f"⚠️ Error saving ticket: {e}")
     finally:
         conn.close()
+
 
 def get_next_ticket():
     """Orchestrator calls this to get the next job."""

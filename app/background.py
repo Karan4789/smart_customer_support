@@ -31,6 +31,10 @@ async def gmail_listener():
                 await asyncio.sleep(30) # Sleep longer if no email
                 continue
 
+            # --- UPDATE: Explicitly tag the source ---
+            email_data['source'] = 'Gmail'
+            # -----------------------------------------
+
             await asyncio.to_thread(add_ticket, email_data)
             logger.info(f"[GMAIL LISTENER] Saved email {email_data.get('message_id')} to database.")
 
@@ -38,6 +42,7 @@ async def gmail_listener():
             logger.critical(f"[GMAIL LISTENER] Critical error: {e}", exc_info=True)
         
         await asyncio.sleep(15) # Sleep shorter if an email was just processed
+
 
 async def orchestrator_task():
     """Polls the database for pending tickets, runs the Triage Agent, and dispatches actions."""
@@ -50,7 +55,10 @@ async def orchestrator_task():
                 await asyncio.sleep(5)
                 continue
             
-            logger.info(f"[ORCHESTRATOR] Processing Ticket #{ticket['id']} from {ticket['sender']}")
+            # Log the source so we know where it came from
+            source = ticket.get('source', 'Unknown')
+            logger.info(f"[ORCHESTRATOR] Processing Ticket #{ticket['id']} from {ticket['sender']} (Source: {source})")
+            
             await process_ticket(ticket)
 
         except Exception as e:
@@ -58,17 +66,21 @@ async def orchestrator_task():
             if ticket:
                 update_ticket_status(ticket['id'], 'FAILED')
         
-        await asyncio.sleep(1) # Minimal sleep to check for next ticket quickly
+        await asyncio.sleep(1)
+
 
 async def process_ticket(ticket: dict):
     """Contains the logic for processing a single ticket."""
+    
+    # --- UPDATE: Pass the source along ---
     request_data = {
         "message_id": ticket['message_id'],
         "sender": ticket['sender'],
         "subject": ticket['subject'],
         "body": ticket['body'],
-        "source": "Gmail"
+        "source": ticket.get('source', 'Gmail') # Default to Gmail if missing for backward compatibility
     }
+    # -------------------------------------
 
     # Step 1: Run Triage Agent
     triage_task = f"""
@@ -97,10 +109,13 @@ async def process_ticket(ticket: dict):
         logger.warning(f"[ORCHESTRATOR] Unknown action from Triage Agent: {action}")
         update_ticket_status(ticket['id'], 'FAILED')
 
+
 async def handle_create_ticket(ticket: dict, request_data: dict, decision: dict):
     """Handles the 'CREATE_TICKET' action."""
     logger.info("[ORCHESTRATOR] Action: CREATE_TICKET. Invoking Jira Tool.")
+    
     description = (
+        f"Source: {request_data.get('source')}\n"  # Include source in Jira ticket
         f"Customer: {request_data.get('sender')}\n\n"
         f"Subject: {request_data.get('subject')}\n\n"
         f"--- Original Message ---\n{request_data.get('body')}"
@@ -119,28 +134,54 @@ async def handle_create_ticket(ticket: dict, request_data: dict, decision: dict)
 
     logger.info(f"[ORCHESTRATOR] Jira Tool success. Ticket: {ticket_key}")
     
-    # Generate and send AI acknowledgment
-    ack_body = await generate_ai_acknowledgment(request_data, triage_agent_executor)
-    await asyncio.to_thread(
-        send_email_tool.func,
-        to=request_data.get('sender'),
-        subject=f"Re: {request_data.get('subject')}",
-        body=ack_body
-    )
-    logger.info("[ORCHESTRATOR] Sent AI acknowledgment via Reply Tool.")
+    # --- UPDATE: Only send email Ack if source is Gmail ---
+    if request_data.get('source') == 'Gmail':
+        # Generate and send AI acknowledgment
+        ack_body = await generate_ai_acknowledgment(request_data, triage_agent_executor)
+        await asyncio.to_thread(
+            send_email_tool.func,
+            to=request_data.get('sender'),
+            subject=f"Re: {request_data.get('subject')}",
+            body=ack_body
+        )
+        logger.info("[ORCHESTRATOR] Sent AI acknowledgment via Reply Tool.")
+    else:
+        logger.info(f"[ORCHESTRATOR] Skipping email acknowledgment for source: {request_data.get('source')}")
+    # -----------------------------------------------------
+
     update_ticket_status(ticket['id'], 'COMPLETED', triage_result=decision)
+
 
 async def handle_send_reply(ticket: dict, request_data: dict, decision: dict):
     """Handles the 'SEND_REPLY' action."""
-    logger.info("[ORCHESTRATOR] Action: SEND_REPLY. Invoking Reply Tool.")
-    await asyncio.to_thread(
-        send_email_tool.func,
-        to=request_data.get('sender'),
-        subject=f"Re: {request_data.get('subject')}",
-        body=decision.get("reply_body")
-    )
-    logger.info("[ORCHESTRATOR] Sent direct reply via Reply Tool.")
-    update_ticket_status(ticket['id'], 'COMPLETED', triage_result=decision)
+    
+    source = request_data.get('source')
+    
+    if source == 'Gmail':
+        logger.info("[ORCHESTRATOR] Action: SEND_REPLY (Gmail). Invoking Reply Tool.")
+        await asyncio.to_thread(
+            send_email_tool.func,
+            to=request_data.get('sender'),
+            subject=f"Re: {request_data.get('subject')}",
+            body=decision.get("reply_body")
+        )
+        logger.info("[ORCHESTRATOR] Sent direct reply via Reply Tool.")
+        update_ticket_status(ticket['id'], 'COMPLETED', triage_result=decision)
+        
+    elif source == 'Discord':
+        # TODO: Implement Discord Reply Tool here
+        logger.warning("[ORCHESTRATOR] Discord reply logic not yet implemented.")
+        update_ticket_status(ticket['id'], 'FAILED') # Mark FAILED so we know it wasn't sent
+
+    elif source == 'Telegram':
+        # TODO: Implement Telegram Reply Tool here
+        logger.warning("[ORCHESTRATOR] Telegram reply logic not yet implemented.")
+        update_ticket_status(ticket['id'], 'FAILED') # Mark FAILED so we know it wasn't sent
+
+    else:
+        logger.warning(f"[ORCHESTRATOR] Unknown source '{source}'. Cannot reply.")
+        update_ticket_status(ticket['id'], 'FAILED')
+
 
 async def generate_ai_acknowledgment(request_data: dict, llm_executor) -> str:
     """Uses an LLM to generate a high-quality, context-aware acknowledgment email."""
@@ -178,3 +219,4 @@ async def generate_ai_acknowledgment(request_data: dict, llm_executor) -> str:
         
     except Exception as e:
         logger.error(f"[REPLY-GEN] Error during AI reply generation: {e}")
+        return "Thank you for reaching out. Our support team has received your request and is actively reviewing it. We will get back to you shortly."
