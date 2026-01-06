@@ -7,6 +7,7 @@ load_dotenv(dotenv_path=dotenv_path)
 
 GMAIL_CREDENTIALS_PATH = os.getenv('GMAIL_CREDENTIALS_PATH', 'credentials.json')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 
 # Jira credentials
 JIRA_API_TOKEN = os.getenv('JIRA_API_TOKEN')

@@ -3,7 +3,8 @@
 import os
 from dotenv import load_dotenv
 from langchain.agents import AgentExecutor, create_openai_tools_agent
-from langchain_google_genai import ChatGoogleGenerativeAI
+# from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langchain import hub
 import json
 from app.utils.logger import setup_logging
@@ -13,12 +14,12 @@ logger = setup_logging()
 
 # --- 1. Setup ---
 load_dotenv()
-gemini_api_key = os.getenv("GEMINI_API_KEY")
-if not gemini_api_key:
-    raise ValueError("❌ GEMINI_API_KEY not found in .env file.")
+groq_api_key = os.getenv("GROQ_API_KEY")
+if not groq_api_key:
+    raise ValueError("❌ GROQ_API_KEY not found in .env file.")
 
 # Initialize LLM
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0, google_api_key=gemini_api_key)
+llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0, api_key=groq_api_key)
 
 # --- 2. Create the Triage Agent ---
 # This agent has no tools, it only uses the LLM to think.

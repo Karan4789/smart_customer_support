@@ -3,7 +3,8 @@
 import os
 from dotenv import load_dotenv
 from langchain.agents import AgentExecutor, create_openai_tools_agent
-from langchain_google_genai import ChatGoogleGenerativeAI
+# from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langchain_google_community import GmailToolkit
 from langchain import hub
 from google.oauth2.credentials import Credentials
@@ -16,21 +17,16 @@ from app.utils.logger import setup_logging
 logger = setup_logging()
 
 # --- 1. Initial Setup ---
+
 load_dotenv()
-logger.info("🔑 Loading credentials from .env file...")
+groq_api_key = os.getenv("GROQ_API_KEY")
+if not groq_api_key:
+    raise ValueError("❌ GROQ_API_KEY not found in .env file.")
 
-# Explicitly load Gemini API key
-gemini_api_key = os.getenv("GEMINI_API_KEY")
-if not gemini_api_key:
-    raise ValueError("❌ GEMINI_API_KEY not found in .env file.")
+# Initialize LLM
 
-# Initialize Gemini model
-logger.info("🚀 Initializing LLM with GEMINI_API_KEY...")
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    temperature=0,
-    google_api_key=gemini_api_key
-)
+logger.info("🚀 Initializing LLM with GROQ_API_KEY...")
+llm = ChatGroq(model="qwen/qwen3-32b", temperature=0, api_key=groq_api_key)
 
 # --- 2. Configure Gmail Authentication ---
 credentials_file = os.getenv("GMAIL_CREDENTIALS_PATH", "credentials.json")
@@ -84,10 +80,16 @@ if __name__ == "__main__":
 
     # NEW TASK: Ask for specific fields instead of a summary
     task = """
-    Search for the single most recent unread email in the inbox.
-    If an unread email is found, get its message ID, sender's email address, subject, and the plain text body.
-    Format the output as a clean JSON object with the keys: "message_id", "sender", "subject", and "body".
-    """
+        Step 1: Search for the latest unread email in the inbox.
+        Step 2: FROM THE SEARCH RESULT, extract the exact 'id' of the email.
+        Step 3: Call the 'get_gmail_message' tool using that EXACT 'id'.
+        Step 4: After successfully reading the email, call the 'modify_gmail_message' tool
+        with:
+        - message_id = the same id
+        - remove_labels = ["UNREAD"]
+        Step 5: Format the final output as a clean JSON object with keys:
+        "message_id", "sender", "subject", "body".
+        """
 
     try:
         result = agent_executor.invoke({"input": task})
