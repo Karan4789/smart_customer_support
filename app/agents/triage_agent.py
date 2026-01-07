@@ -46,19 +46,33 @@ if __name__ == "__main__":
     # --- MODIFICATION IS HERE ---
     # The task now explicitly demands a clean JSON output and nothing else.
     task = f"""
-    You are an expert customer support triage agent. Analyze the following email content and decide the next action.
+    You are an expert customer support triage AI.
+    
+    Analyze the email below and classify it into one of two categories:
+    
+    1. **Technical Issue / Bug / Urgent / Payment Problem**
+       -> Set "action" to "CREATE_TICKET".
+       -> Set "priority" to "High".
+       -> "summary" should be a title suitable for an engineering ticket.
+
+    2. **General Question / Feature Request / Feedback / Low Urgency**
+       -> Set "action" to "SEND_REPLY".
+       -> Set "priority" to "Normal" or "Low".
+       -> "summary" should be a short topic summary.
+
+    Your output MUST be a valid JSON object with exactly these keys:
+    {{
+      "priority": "High" | "Normal" | "Low",
+      "action": "CREATE_TICKET" | "SEND_REPLY",
+      "summary": "string"
+    }}
+
+    IMPORTANT: "action" must be EXACTLY "CREATE_TICKET" or "SEND_REPLY". Do not use any other words.
 
     Email Details:
     - Sender: {email_data['sender']}
     - Subject: {email_data['subject']}
     - Body: {email_data['body']}
-
-    Your task is to respond with ONLY a compact, machine-readable JSON object.
-    The JSON object must contain these exact keys:
-    - "priority": A string, one of "High", "Normal", or "Low".
-    - "action": A string, one of "CREATE_TICKET" or "SEND_REPLY".
-    - "summary": A string containing a concise, one-sentence summary for a Jira ticket title.
-    - "reply_body": A string containing a suggested text for a direct reply. If creating a ticket, this should be an acknowledgment message.
 
     Do not include any conversational text, explanations, or markdown formatting like ```
     """

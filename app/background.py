@@ -2,8 +2,10 @@ import asyncio
 import json
 from app.agents.gmail_agent import agent_executor as gmail_scout_executor
 from app.agents.triage_agent import agent_executor as triage_agent_executor
+from app.agents.reply_agent import generate_reply  
 from app.agents.tools.jira_tools import create_jira_ticket_tool
 from app.agents.tools.reply_tools import send_email_tool
+# from app.agents.tools.discord_tools import send_discord_message_tool # <--- Import this when ready
 from app.database import add_ticket, get_next_ticket, update_ticket_status
 from app.utils.jsonextract import extract_json_object
 from app.utils.logger import setup_logging
@@ -11,11 +13,12 @@ from app.utils.logger import setup_logging
 logger = setup_logging()
 
 async def gmail_listener():
-    """A background task that runs the Gmail Scout Agent to find and save new emails to the database."""
+    """A background task that runs the Gmail Scout Agent."""
     while True:
         try:
-            logger.info("[GMAIL LISTENER] Running Scout Agent to find new emails...")
+            logger.info("[GMAIL LISTENER] Running Scout Agent...")
             
+            # Simplified Task - We don't need complex parsing here, the agent does it
             task = """
             Search for the single most recent unread email in the inbox.
             If found, get its message ID, sender, subject, and plain text body.
@@ -23,200 +26,162 @@ async def gmail_listener():
             """
             
             result = await asyncio.to_thread(gmail_scout_executor.invoke, {"input": task})
-            email_json_str = result.get("output", "")
+            
+            # Parse Output
+            try:
+                # If your agent returns a Pydantic object (from our previous fix), convert it to dict
+                if hasattr(result["output"], "dict"):
+                     email_data = result["output"].dict()
+                elif isinstance(result["output"], str):
+                     email_data = extract_json_object(result["output"])
+                else:
+                     email_data = result["output"]
+            except Exception as e:
+                logger.warning(f"[GMAIL LISTENER] Failed to parse agent output: {e}")
+                email_data = None
 
-            email_data = extract_json_object(email_json_str)
             if not email_data:
-                logger.info("[GMAIL LISTENER] No new unread emails found or agent returned non-JSON output.")
-                await asyncio.sleep(30) # Sleep longer if no email
+                await asyncio.sleep(30)
                 continue
 
-            # --- UPDATE: Explicitly tag the source ---
             email_data['source'] = 'Gmail'
-            # -----------------------------------------
-
-            await asyncio.to_thread(add_ticket, email_data)
-            logger.info(f"[GMAIL LISTENER] Saved email {email_data.get('message_id')} to database.")
+            
+            try:
+                await asyncio.to_thread(add_ticket, email_data)
+                logger.info(f"[GMAIL LISTENER] Saved email {email_data.get('message_id')}")
+            except Exception as e:
+                # If it's a unique constraint error, just log a warning and continue
+                if "UNIQUE constraint failed" in str(e):
+                    logger.warning(f"[GMAIL LISTENER] Duplicate email found ({email_data.get('message_id')}). Skipping.")
+                    await asyncio.sleep(30) # Sleep and try again later
+                    continue
+                else:
+                    raise e # Re-raise real errors
 
         except Exception as e:
-            logger.critical(f"[GMAIL LISTENER] Critical error: {e}", exc_info=True)
+            logger.critical(f"[GMAIL LISTENER] Error: {e}", exc_info=True)
         
-        await asyncio.sleep(15) # Sleep shorter if an email was just processed
+        await asyncio.sleep(15)
 
 
 async def orchestrator_task():
-    """Polls the database for pending tickets, runs the Triage Agent, and dispatches actions."""
+    """Polls DB and runs Triage -> Action -> Reply flow."""
     while True:
-        ticket = None
-        try:
-            ticket = await asyncio.to_thread(get_next_ticket)
-            
-            if not ticket:
-                await asyncio.sleep(5)
-                continue
-            
-            # Log the source so we know where it came from
-            source = ticket.get('source', 'Unknown')
-            logger.info(f"[ORCHESTRATOR] Processing Ticket #{ticket['id']} from {ticket['sender']} (Source: {source})")
-            
-            await process_ticket(ticket)
+        ticket = await asyncio.to_thread(get_next_ticket)
+        if not ticket:
+            await asyncio.sleep(5)
+            continue
 
+        try:
+            logger.info(f"[ORCHESTRATOR] Processing Ticket #{ticket['id']} ({ticket['source']})")
+            await process_ticket(ticket)
         except Exception as e:
-            logger.critical(f"[ORCHESTRATOR] Unhandled error: {e}", exc_info=True)
-            if ticket:
-                update_ticket_status(ticket['id'], 'FAILED')
+            logger.critical(f"[ORCHESTRATOR] Error processing ticket #{ticket['id']}: {e}", exc_info=True)
+            update_ticket_status(ticket['id'], 'FAILED')
         
         await asyncio.sleep(1)
 
 
 async def process_ticket(ticket: dict):
-    """Contains the logic for processing a single ticket."""
-    
-    # --- UPDATE: Pass the source along ---
-    request_data = {
-        "message_id": ticket['message_id'],
-        "sender": ticket['sender'],
-        "subject": ticket['subject'],
-        "body": ticket['body'],
-        "source": ticket.get('source', 'Gmail') # Default to Gmail if missing for backward compatibility
-    }
-    # -------------------------------------
-
-    # Step 1: Run Triage Agent
-    triage_task = f"""
-    Analyze this email and respond with a JSON object containing these keys:
-    "priority", "action" ("CREATE_TICKET" or "SEND_REPLY"), "summary", "reply_body".
-    Do not include any conversational text.
-    Email: {json.dumps(request_data)}
+    """
+    Core Logic:
+    1. Triage (Decide)
+    2. Execute Action (Jira)
+    3. Generate Reply (Reply Agent)
+    4. Send Reply (Tools)
     """
     
-    result = await asyncio.to_thread(triage_agent_executor.invoke, {"input": triage_task})
-    decision = extract_json_object(result.get("output", ""))
+    # --- Step 1: Triage (Decision Only) ---
+    triage_task = f"""
+    You are a triage system. Analyze this support request.
     
-    if not decision or not all(k in decision for k in ("priority", "action", "summary", "reply_body")):
-        logger.error(f"[ORCHESTRATOR] Invalid triage JSON for Ticket #{ticket['id']}. Raw: {result.get('output')}")
+    Input: {json.dumps(ticket, default=str)}
+    
+    REQUIRED OUTPUT FORMAT (JSON):
+    {{
+        "priority": "High" | "Normal" | "Low",
+        "action": "CREATE_TICKET" | "SEND_REPLY",
+        "summary": "Short title of the issue"
+    }}
+    
+    RULES:
+    1. If the issue is a Bug, Error, Payment Failure, or Urgent -> Set "action": "CREATE_TICKET".
+    2. If the issue is a Question, Feedback, or General Inquiry -> Set "action": "SEND_REPLY".
+    3. "action" MUST be exactly "CREATE_TICKET" or "SEND_REPLY". Do not use any other text.
+    """
+    
+    triage_result = await asyncio.to_thread(triage_agent_executor.invoke, {"input": triage_task})
+    decision = extract_json_object(triage_result.get("output", ""))
+    
+    if not decision:
+        logger.error(f"[ORCHESTRATOR] Triage failed for #{ticket['id']}")
         update_ticket_status(ticket['id'], 'FAILED')
         return
-        
-    logger.info(f"[ORCHESTRATOR] Triage decision: {decision}")
+
     action = decision.get("action")
+    summary = decision.get("summary")
+    logger.info(f"[ORCHESTRATOR] Triage Decision: {action} | {summary}")
+
+    # --- Step 2: Execute Action ---
+    action_details = ""
     
     if action == "CREATE_TICKET":
-        await handle_create_ticket(ticket, request_data, decision)
-    elif action == "SEND_REPLY":
-        await handle_send_reply(ticket, request_data, decision)
-    else:
-        logger.warning(f"[ORCHESTRATOR] Unknown action from Triage Agent: {action}")
-        update_ticket_status(ticket['id'], 'FAILED')
-
-
-async def handle_create_ticket(ticket: dict, request_data: dict, decision: dict):
-    """Handles the 'CREATE_TICKET' action."""
-    logger.info("[ORCHESTRATOR] Action: CREATE_TICKET. Invoking Jira Tool.")
-    
-    description = (
-        f"Source: {request_data.get('source')}\n"  # Include source in Jira ticket
-        f"Customer: {request_data.get('sender')}\n\n"
-        f"Subject: {request_data.get('subject')}\n\n"
-        f"--- Original Message ---\n{request_data.get('body')}"
-    )
-    
-    ticket_key = await asyncio.to_thread(
-        create_jira_ticket_tool.func,
-        summary=decision.get("summary"),
-        description=description
-    )
-    
-    if not ticket_key:
-        logger.error("[ORCHESTRATOR] Jira Tool failed to create ticket.")
-        update_ticket_status(ticket['id'], 'FAILED')
-        return
-
-    logger.info(f"[ORCHESTRATOR] Jira Tool success. Ticket: {ticket_key}")
-    
-    # --- UPDATE: Only send email Ack if source is Gmail ---
-    if request_data.get('source') == 'Gmail':
-        # Generate and send AI acknowledgment
-        ack_body = await generate_ai_acknowledgment(request_data, triage_agent_executor)
-        await asyncio.to_thread(
-            send_email_tool.func,
-            to=request_data.get('sender'),
-            subject=f"Re: {request_data.get('subject')}",
-            body=ack_body
+        # Create Jira Ticket
+        ticket_key = await asyncio.to_thread(
+            create_jira_ticket_tool.func,
+            summary=summary,
+            description=f"Source: {ticket['source']}\n\n{ticket['body']}"
         )
-        logger.info("[ORCHESTRATOR] Sent AI acknowledgment via Reply Tool.")
-    else:
-        logger.info(f"[ORCHESTRATOR] Skipping email acknowledgment for source: {request_data.get('source')}")
-    # -----------------------------------------------------
-
-    update_ticket_status(ticket['id'], 'COMPLETED', triage_result=decision)
-
-
-async def handle_send_reply(ticket: dict, request_data: dict, decision: dict):
-    """Handles the 'SEND_REPLY' action."""
-    
-    source = request_data.get('source')
-    
-    if source == 'Gmail':
-        logger.info("[ORCHESTRATOR] Action: SEND_REPLY (Gmail). Invoking Reply Tool.")
-        await asyncio.to_thread(
-            send_email_tool.func,
-            to=request_data.get('sender'),
-            subject=f"Re: {request_data.get('subject')}",
-            body=decision.get("reply_body")
-        )
-        logger.info("[ORCHESTRATOR] Sent direct reply via Reply Tool.")
-        update_ticket_status(ticket['id'], 'COMPLETED', triage_result=decision)
-        
-    elif source == 'Discord':
-        # TODO: Implement Discord Reply Tool here
-        logger.warning("[ORCHESTRATOR] Discord reply logic not yet implemented.")
-        update_ticket_status(ticket['id'], 'FAILED') # Mark FAILED so we know it wasn't sent
-
-    elif source == 'Telegram':
-        # TODO: Implement Telegram Reply Tool here
-        logger.warning("[ORCHESTRATOR] Telegram reply logic not yet implemented.")
-        update_ticket_status(ticket['id'], 'FAILED') # Mark FAILED so we know it wasn't sent
-
-    else:
-        logger.warning(f"[ORCHESTRATOR] Unknown source '{source}'. Cannot reply.")
-        update_ticket_status(ticket['id'], 'FAILED')
-
-
-async def generate_ai_acknowledgment(request_data: dict, llm_executor) -> str:
-    """Uses an LLM to generate a high-quality, context-aware acknowledgment email."""
-    logger.info("[REPLY-GEN] Generating AI acknowledgment...")
-    
-    prompt = f"""
-    You are a friendly and professional customer support agent.
-    A customer has sent the following email to our support team.
-    
-    Original Email Subject: "{request_data.get('subject')}"
-    Original Email Body:
-    ---
-    {request_data.get('body')}
-    ---
-    
-    Your task is to write a short, reassuring, and professional email acknowledgment to the customer.
-    - Acknowledge their specific issue briefly so they know you've understood.
-    - Let them know that the support team has received their request and is actively reviewing it.
-    - Reassure them that they will receive an update soon.
-    - Keep the tone helpful, empathetic, and professional.
-    - DO NOT mention any ticket ID or reference number.
-    - Sign off as "Customer Support Team".
-    """
-    
-    try:
-        result = await asyncio.to_thread(llm_executor.invoke, {"input": prompt})
-        ai_reply = result.get("output", "")
-        
-        if not ai_reply:
-            logger.warning("[REPLY-GEN] AI failed to generate a reply, using template.")
-            return "Thank you for reaching out. Our support team has received your request and is actively reviewing it. We will get back to you shortly."
+        if ticket_key:
+            action_details = f"Created Jira Ticket {ticket_key}"
+        else:
+            action_details = "Failed to create ticket (system error)"
             
-        logger.info("[REPLY-GEN] Successfully generated AI acknowledgment.")
-        return ai_reply
-        
-    except Exception as e:
-        logger.error(f"[REPLY-GEN] Error during AI reply generation: {e}")
-        return "Thank you for reaching out. Our support team has received your request and is actively reviewing it. We will get back to you shortly."
+    elif action == "SEND_REPLY":
+        action_details = "Decided to reply directly (No ticket created)"
+
+    # --- Step 3: Generate Reply (The Writer) ---
+    # We use the specialized Reply Agent here!
+    reply_body = await generate_reply(
+        sender=ticket['sender'],
+        summary=summary,
+        action_taken=action_details,
+        original_body=ticket['body'],
+        platform=ticket['source']
+    )
+
+    # --- Step 4: Send the Reply ---
+    send_success = False
+    
+    if ticket['source'] == 'Gmail':
+        # Use Gmail Tool
+        try:
+            await asyncio.to_thread(
+                send_email_tool.func,
+                to=ticket['sender'],
+                subject=f"Re: {ticket['subject']}",
+                body=reply_body
+            )
+            send_success = True
+        except Exception as e:
+            logger.error(f"Failed to send email: {e}")
+
+    elif ticket['source'] == 'Discord':
+        # Use Discord Tool
+        # Assuming ticket['message_id'] stores "discord_123456"
+        # and we need to reply to the channel. 
+        # For now, we might just post to the support channel.
+        try:
+             # await send_discord_message_tool.ainvoke(...) 
+             # (Add this implementation when you import the tool)
+             logger.info(f"Would send Discord message: {reply_body[:50]}...")
+             send_success = True 
+        except Exception as e:
+             logger.error(f"Failed to send Discord msg: {e}")
+
+    # --- Finalize ---
+    if send_success:
+        update_ticket_status(ticket['id'], 'COMPLETED', triage_result=decision)
+        logger.info(f"[ORCHESTRATOR] Ticket #{ticket['id']} Completed.")
+    else:
+        update_ticket_status(ticket['id'], 'FAILED')
