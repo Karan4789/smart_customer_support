@@ -65,7 +65,11 @@ gmail_service = build("gmail", "v1", credentials=creds)
 
 # Initialize Gmail Toolkit
 gmail_toolkit = GmailToolkit(api_resource=gmail_service)
-tools = gmail_toolkit.get_tools()
+Tools = gmail_toolkit.get_tools()
+
+allowed_tools = ["search_gmail", "get_gmail_message", "modify_gmail_message"]
+tools = [t for t in Tools if t.name in allowed_tools]
+
 logger.info(f"📬 Agent equipped with {len(tools)} Gmail tools.")
 
 # --- 3. Create the Agent ---

@@ -7,6 +7,7 @@ from typing import Dict
 
 # --- Import from your new background module ---
 from app.background import gmail_listener, orchestrator_task
+from app.services.discord_service import get_bot
 from app.database import init_db
 from app.utils.logger import setup_logging
 
@@ -19,25 +20,38 @@ async def lifespan(app: FastAPI):
     """Handles application startup and shutdown events."""
     logger.info("--- Application Starting Up: Launching Agentic Workflow ---")
     
-    # Initialize the database
+    # 1. Initialize the database
     init_db()
     logger.info("[DATABASE] Initialized support_system.db")
     
-    # Start background tasks from the imported module
+    # 2. Start Background Services
+    # - Gmail Listener (Loops forever)
+    # - Discord Bot (Connects to Websocket)
+    # - Orchestrator (Loops forever)
     gmail_task = asyncio.create_task(gmail_listener())
+    discord_task = asyncio.create_task(get_bot())
     orchestrator = asyncio.create_task(orchestrator_task())
+
+    logger.info("✅ All background services started.")
 
     yield
     
+    # --- Shutdown Sequence ---
     logger.info("--- Application Shutting Down ---")
+    
+    # Cancel all background tasks
     gmail_task.cancel()
     orchestrator.cancel()
+    discord_task.cancel()
     
-    # Wait briefly for tasks to clean up
+    # Wait briefly for tasks to clean up to avoid "Task was destroyed but it is pending!" errors
     try:
-        await asyncio.wait([gmail_task, orchestrator], timeout=1.0)
+        await asyncio.wait([gmail_task, orchestrator, discord_task], timeout=2.0)
+        logger.info("✅ Background tasks stopped gracefully.")
     except asyncio.TimeoutError:
-        logger.warning("Background tasks did not exit typically.")
+        logger.warning("⚠️ Some background tasks timed out during shutdown.")
+    except Exception as e:
+        logger.error(f"❌ Error during shutdown: {e}")
 
 app = FastAPI(lifespan=lifespan)
 

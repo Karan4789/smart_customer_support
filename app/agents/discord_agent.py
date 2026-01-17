@@ -1,3 +1,4 @@
+# app/agents/discord_agent.py
 import os
 from dotenv import load_dotenv
 from langchain.agents import AgentExecutor, create_openai_tools_agent

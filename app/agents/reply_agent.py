@@ -1,3 +1,4 @@
+# app/agents/reply_agent.py
 import os
 from langchain_groq import ChatGroq
 from langchain.prompts import ChatPromptTemplate
@@ -14,8 +15,7 @@ llm = ChatGroq(
     api_key=config.GROQ_API_KEY
 )
 
-# --- REVISED PROMPT ---
-# Incorporates Universal Context + Your Specific Tone Instructions
+# --- PROMPT ---
 reply_prompt = ChatPromptTemplate.from_messages([
     ("system", """
     You are a friendly and professional customer support agent for a tech company.

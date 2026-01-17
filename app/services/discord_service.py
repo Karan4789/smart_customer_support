@@ -1,7 +1,8 @@
+# app/services/discord_service.py
 import discord
 import asyncio
 from app.config import config
-from app.database import add_ticket  # <--- Make sure this is imported!
+from app.database import add_ticket  
 from app.utils.logger import setup_logging
 
 logger = setup_logging()

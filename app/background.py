@@ -5,7 +5,10 @@ from app.agents.triage_agent import agent_executor as triage_agent_executor
 from app.agents.reply_agent import generate_reply  
 from app.agents.tools.jira_tools import create_jira_ticket_tool
 from app.agents.tools.reply_tools import send_email_tool
-# from app.agents.tools.discord_tools import send_discord_message_tool # <--- Import this when ready
+# --- 1. Import Discord Tool and Config ---
+from app.agents.tools.discord_tools import send_discord_message_tool 
+from app.config import config
+# -----------------------------------------
 from app.database import add_ticket, get_next_ticket, update_ticket_status
 from app.utils.jsonextract import extract_json_object
 from app.utils.logger import setup_logging
@@ -18,18 +21,14 @@ async def gmail_listener():
         try:
             logger.info("[GMAIL LISTENER] Running Scout Agent...")
             
-            # Simplified Task - We don't need complex parsing here, the agent does it
             task = """
             Search for the single most recent unread email in the inbox.
-            If found, get its message ID, sender, subject, and plain text body.
-            Format the output as a JSON object with keys: "message_id", "sender", "subject", and "body".
+            Output JSON with keys: "message_id", "sender", "subject", "body".
             """
             
             result = await asyncio.to_thread(gmail_scout_executor.invoke, {"input": task})
             
-            # Parse Output
             try:
-                # If your agent returns a Pydantic object (from our previous fix), convert it to dict
                 if hasattr(result["output"], "dict"):
                      email_data = result["output"].dict()
                 elif isinstance(result["output"], str):
@@ -50,13 +49,12 @@ async def gmail_listener():
                 await asyncio.to_thread(add_ticket, email_data)
                 logger.info(f"[GMAIL LISTENER] Saved email {email_data.get('message_id')}")
             except Exception as e:
-                # If it's a unique constraint error, just log a warning and continue
                 if "UNIQUE constraint failed" in str(e):
                     logger.warning(f"[GMAIL LISTENER] Duplicate email found ({email_data.get('message_id')}). Skipping.")
-                    await asyncio.sleep(30) # Sleep and try again later
+                    await asyncio.sleep(30)
                     continue
                 else:
-                    raise e # Re-raise real errors
+                    raise e 
 
         except Exception as e:
             logger.critical(f"[GMAIL LISTENER] Error: {e}", exc_info=True)
@@ -92,25 +90,10 @@ async def process_ticket(ticket: dict):
     """
     
     # --- Step 1: Triage (Decision Only) ---
-    triage_task = f"""
-    You are a triage system. Analyze this support request.
-    
-    Input: {json.dumps(ticket, default=str)}
-    
-    REQUIRED OUTPUT FORMAT (JSON):
-    {{
-        "priority": "High" | "Normal" | "Low",
-        "action": "CREATE_TICKET" | "SEND_REPLY",
-        "summary": "Short title of the issue"
-    }}
-    
-    RULES:
-    1. If the issue is a Bug, Error, Payment Failure, or Urgent -> Set "action": "CREATE_TICKET".
-    2. If the issue is a Question, Feedback, or General Inquiry -> Set "action": "SEND_REPLY".
-    3. "action" MUST be exactly "CREATE_TICKET" or "SEND_REPLY". Do not use any other text.
-    """
-    
-    triage_result = await asyncio.to_thread(triage_agent_executor.invoke, {"input": triage_task})
+    triage_result = await asyncio.to_thread(
+        triage_agent_executor.invoke, 
+        {"input": json.dumps(ticket, default=str)}
+    )
     decision = extract_json_object(triage_result.get("output", ""))
     
     if not decision:
@@ -121,6 +104,7 @@ async def process_ticket(ticket: dict):
     action = decision.get("action")
     summary = decision.get("summary")
     logger.info(f"[ORCHESTRATOR] Triage Decision: {action} | {summary}")
+
 
     # --- Step 2: Execute Action ---
     action_details = ""
@@ -140,8 +124,8 @@ async def process_ticket(ticket: dict):
     elif action == "SEND_REPLY":
         action_details = "Decided to reply directly (No ticket created)"
 
+
     # --- Step 3: Generate Reply (The Writer) ---
-    # We use the specialized Reply Agent here!
     reply_body = await generate_reply(
         sender=ticket['sender'],
         summary=summary,
@@ -149,6 +133,7 @@ async def process_ticket(ticket: dict):
         original_body=ticket['body'],
         platform=ticket['source']
     )
+
 
     # --- Step 4: Send the Reply ---
     send_success = False
@@ -163,21 +148,32 @@ async def process_ticket(ticket: dict):
                 body=reply_body
             )
             send_success = True
+            logger.info(f"[ORCHESTRATOR] Sent email reply to {ticket['sender']}")
         except Exception as e:
             logger.error(f"Failed to send email: {e}")
 
     elif ticket['source'] == 'Discord':
-        # Use Discord Tool
-        # Assuming ticket['message_id'] stores "discord_123456"
-        # and we need to reply to the channel. 
-        # For now, we might just post to the support channel.
+        # --- 2. Implement Discord Logic ---
         try:
-             # await send_discord_message_tool.ainvoke(...) 
-             # (Add this implementation when you import the tool)
-             logger.info(f"Would send Discord message: {reply_body[:50]}...")
+             # We use the default support channel ID from config.
+             # Ideally, we would parse the user ID from ticket['sender'] and DM them,
+             # but replying to the channel is safer for a v1.
+             target_channel = str(config.DISCORD_SUPPORT_CHANNEL_ID)
+             
+             logger.info(f"Sending Discord reply to channel {target_channel}...")
+             
+             # Call the tool function directly (asyncio.to_thread isn't strictly needed for async funcs but consistent)
+             # Note: send_discord_message_tool.coroutine is the async function _send_discord_message
+             await send_discord_message_tool.coroutine(
+                 message=f"**Replying to {ticket['sender']}:**\n{reply_body}",
+                 channel_id=target_channel
+             )
+             
              send_success = True 
+             logger.info(f"[ORCHESTRATOR] Sent Discord reply to channel {target_channel}")
         except Exception as e:
              logger.error(f"Failed to send Discord msg: {e}")
+
 
     # --- Finalize ---
     if send_success:
