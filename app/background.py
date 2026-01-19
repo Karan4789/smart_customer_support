@@ -5,10 +5,9 @@ from app.agents.triage_agent import agent_executor as triage_agent_executor
 from app.agents.reply_agent import generate_reply  
 from app.agents.tools.jira_tools import create_jira_ticket_tool
 from app.agents.tools.reply_tools import send_email_tool
-# --- 1. Import Discord Tool and Config ---
 from app.agents.tools.discord_tools import send_discord_message_tool 
+from app.agents.tools.telegram_tools import send_telegram_message_tool
 from app.config import config
-# -----------------------------------------
 from app.database import add_ticket, get_next_ticket, update_ticket_status
 from app.utils.jsonextract import extract_json_object
 from app.utils.logger import setup_logging
@@ -22,7 +21,7 @@ async def gmail_listener():
             logger.info("[GMAIL LISTENER] Running Scout Agent...")
             
             task = """
-            Search for the single most recent unread email in the inbox.
+            Search for the single most recent email matching: 'in:inbox category:primary is:unread -from:me'.
             Output JSON with keys: "message_id", "sender", "subject", "body".
             """
             
@@ -59,7 +58,7 @@ async def gmail_listener():
         except Exception as e:
             logger.critical(f"[GMAIL LISTENER] Error: {e}", exc_info=True)
         
-        await asyncio.sleep(15)
+        await asyncio.sleep(30)
 
 
 async def orchestrator_task():
@@ -67,7 +66,7 @@ async def orchestrator_task():
     while True:
         ticket = await asyncio.to_thread(get_next_ticket)
         if not ticket:
-            await asyncio.sleep(5)
+            await asyncio.sleep(10)
             continue
 
         try:
@@ -153,27 +152,34 @@ async def process_ticket(ticket: dict):
             logger.error(f"Failed to send email: {e}")
 
     elif ticket['source'] == 'Discord':
-        # --- 2. Implement Discord Logic ---
+        # Use Discord Tool
         try:
-             # We use the default support channel ID from config.
-             # Ideally, we would parse the user ID from ticket['sender'] and DM them,
-             # but replying to the channel is safer for a v1.
              target_channel = str(config.DISCORD_SUPPORT_CHANNEL_ID)
-             
              logger.info(f"Sending Discord reply to channel {target_channel}...")
-             
-             # Call the tool function directly (asyncio.to_thread isn't strictly needed for async funcs but consistent)
-             # Note: send_discord_message_tool.coroutine is the async function _send_discord_message
              await send_discord_message_tool.coroutine(
                  message=f"**Replying to {ticket['sender']}:**\n{reply_body}",
                  channel_id=target_channel
              )
-             
              send_success = True 
              logger.info(f"[ORCHESTRATOR] Sent Discord reply to channel {target_channel}")
         except Exception as e:
              logger.error(f"Failed to send Discord msg: {e}")
 
+    elif ticket['source'] == 'Telegram':
+        # Use Telegram Tool
+        try:
+             # In Telegram, the sender IS the chat ID
+             chat_id = ticket['sender']
+             logger.info(f"Sending Telegram reply to {chat_id}...")
+             
+             await send_telegram_message_tool.coroutine(
+                 chat_id=chat_id,
+                 text=reply_body
+             )
+             send_success = True
+             logger.info(f"[ORCHESTRATOR] Sent Telegram reply to {chat_id}")
+        except Exception as e:
+             logger.error(f"Failed to send Telegram msg: {e}")
 
     # --- Finalize ---
     if send_success:

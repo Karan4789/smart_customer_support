@@ -1,29 +1,37 @@
-from telegram import Bot
 from langchain.tools import StructuredTool
 from pydantic import BaseModel, Field
-import asyncio
-from app.config import config
+from app.services.telegram_service import send_telegram_message, get_telegram_updates
 
-# Initialize the raw bot client
-bot_instance = Bot(token=config.TELEGRAM_BOT_TOKEN)
+# --- Tool 1: Send Message ---
+class SendTelegramArgs(BaseModel):
+    chat_id: str = Field(description="Telegram Chat ID")
+    text: str = Field(description="Message text")
 
-class SendTelegramMessageArgs(BaseModel):
-    chat_id: str = Field(description="The numeric Telegram Chat ID to send the message to.")
-    text: str = Field(description="The text content of the message.")
+async def _send_wrapper(chat_id: str, text: str):
+    return await send_telegram_message(chat_id, text)
 
-async def _send_telegram_message(chat_id: str, text: str) -> str:
-    """Sends a message to a Telegram user."""
-    try:
-        await bot_instance.send_message(chat_id=chat_id, text=text)
-        return f"Successfully sent Telegram message to {chat_id}"
-    except Exception as e:
-        return f"Error sending Telegram message: {str(e)}"
-
-# Export the tool
 send_telegram_message_tool = StructuredTool.from_function(
-    func=_send_telegram_message,
+    func=_send_wrapper,
     name="SendTelegramMessage",
-    description="Sends a reply to a Telegram user. Requires 'chat_id' and 'text'.",
-    args_schema=SendTelegramMessageArgs,
-    coroutine=_send_telegram_message
+    description="Sends a Telegram reply.",
+    args_schema=SendTelegramArgs,
+    coroutine=_send_wrapper
+)
+
+# --- Tool 2: Fetch Updates (THE NEW TOOL YOU WANTED) ---
+class FetchTelegramArgs(BaseModel):
+    pass # No args needed
+
+async def _fetch_wrapper():
+    updates = await get_telegram_updates()
+    if not updates:
+        return "No new messages."
+    return str(updates) # Return raw list string for LLM to parse
+
+read_telegram_messages_tool = StructuredTool.from_function(
+    func=_fetch_wrapper,
+    name="FetchTelegramUpdates",
+    description="Checks for new messages on Telegram. Returns a list of message objects.",
+    args_schema=FetchTelegramArgs,
+    coroutine=_fetch_wrapper
 )

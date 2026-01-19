@@ -2,7 +2,6 @@
 import discord
 import asyncio
 from app.config import config
-from app.database import add_ticket  
 from app.utils.logger import setup_logging
 
 logger = setup_logging()
@@ -11,6 +10,7 @@ logger = setup_logging()
 bot_instance = None
 bot_task = None
 action_queue = asyncio.Queue()
+message_callback = None  # Callback function to handle messages
 
 class DiscordBotClient(discord.Client):
     """A custom Discord client that processes actions from a queue."""
@@ -24,33 +24,17 @@ class DiscordBotClient(discord.Client):
         # Signal readiness
         await action_queue.put({"type": "ready_signal"})
 
-    
     async def on_message(self, message):
         """
         Triggered automatically when a message is sent in a channel the bot can see.
+        Delegates to the callback if one is registered.
         """
-        # 1. Ignore messages from the bot itself (to prevent loops)
         if message.author == self.user:
             return
-
-        # 2. Prepare the ticket data
-        sender_name = f"{message.author.name}#{message.author.discriminator}"
-        ticket_data = {
-            "message_id": f"discord_{message.id}",
-            "sender": f"{sender_name} (ID: {message.author.id})",
-            "subject": f"Discord Message from #{message.channel.name}",
-            "body": message.content,
-            "source": "Discord"
-        }
         
-        # 3. Save to DB
-        # add_ticket is synchronous (sqlite3), so we wrap it in a thread
-        try:
-            await asyncio.to_thread(add_ticket, ticket_data)
-            logger.info(f"[DISCORD SCOUT] Captured message from {sender_name}")
-        except Exception as e:
-            logger.error(f"[DISCORD SCOUT] Error saving ticket: {e}")
-    # ------------------------
+        # Call the registered callback if it exists
+        if message_callback:
+            await message_callback(message)
 
     async def process_actions(self):
         """Main loop to handle requests from the queue."""
@@ -102,6 +86,11 @@ class DiscordBotClient(discord.Client):
     async def _handle_stop(self, future):
         if future: future.set_result("Bot shutting down.")
         await self.close()
+
+def set_message_callback(callback):
+    """Register a callback function to handle incoming messages."""
+    global message_callback
+    message_callback = callback
 
 async def get_bot():
     """Ensures the bot is running and returns the instance."""

@@ -1,5 +1,3 @@
-# app/main.py
-
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 import asyncio
@@ -7,7 +5,9 @@ from typing import Dict
 
 # --- Import from your new background module ---
 from app.background import gmail_listener, orchestrator_task
-from app.services.discord_service import get_bot
+from app.agents.discord_agent import run_discord_scout_agent
+from app.agents.telegram_agent import run_telegram_scout_agent
+# -------------------------------------
 from app.database import init_db
 from app.utils.logger import setup_logging
 
@@ -26,10 +26,13 @@ async def lifespan(app: FastAPI):
     
     # 2. Start Background Services
     # - Gmail Listener (Loops forever)
-    # - Discord Bot (Connects to Websocket)
+    # - Discord Agent (Connects to Websocket)
+    # - Telegram Agent (Polling Loop)
     # - Orchestrator (Loops forever)
+    
     gmail_task = asyncio.create_task(gmail_listener())
-    discord_task = asyncio.create_task(get_bot())
+    discord_task = asyncio.create_task(run_discord_scout_agent()) # <--- Now using the Agent function
+    telegram_task = asyncio.create_task(run_telegram_scout_agent())
     orchestrator = asyncio.create_task(orchestrator_task())
 
     logger.info("✅ All background services started.")
@@ -43,10 +46,12 @@ async def lifespan(app: FastAPI):
     gmail_task.cancel()
     orchestrator.cancel()
     discord_task.cancel()
+    telegram_task.cancel()
     
     # Wait briefly for tasks to clean up to avoid "Task was destroyed but it is pending!" errors
     try:
-        await asyncio.wait([gmail_task, orchestrator, discord_task], timeout=2.0)
+        # Don't forget to include telegram_task in the wait list!
+        await asyncio.wait([gmail_task, orchestrator, discord_task, telegram_task], timeout=2.0)
         logger.info("✅ Background tasks stopped gracefully.")
     except asyncio.TimeoutError:
         logger.warning("⚠️ Some background tasks timed out during shutdown.")
