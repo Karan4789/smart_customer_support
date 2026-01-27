@@ -1,50 +1,29 @@
 # Smart Customer Support Automation
 
-An **AI-powered, multi-agent application** that automates customer support workflows. This system uses a **Scout Agent** to monitor a Gmail inbox, a **Triage Agent** to analyze and decide on actions, and an **Orchestrator** to execute tasks like creating Jira tickets or sending replies.
+An **AI-powered, multi-agent application** that automates customer support workflows across **multiple channels**. This system uses dedicated **Scout Agents** to monitor Gmail, Discord, and Telegram, a **Triage Agent** to analyze and decide on actions, and an **Orchestrator** to execute tasks like creating Jira tickets or sending intelligent replies.
 
-Built with **Python**, **FastAPI**, and **LangChain**, this project demonstrates a robust, scalable producer-consumer architecture for handling real-world support automation.
+Built with **Python**, **FastAPI**, **LangChain**, and **Groq LLMs**, this project demonstrates a robust, scalable producer-consumer architecture for handling real-world support automation across diverse communication platforms.
 
 ---
 
 ## 🏛️ Architecture
 
-The system uses a queue-based, multi-agent workflow to decouple tasks and ensure reliable processing.
+The system uses a queue-based, multi-agent workflow to decouple tasks and ensure reliable processing across multiple communication channels.
 
-```
-┌──────────────────────┐      ┌─────────────────┐      ┌───────────────────┐
-│                      │      │                 │      │                   │
-│  Gmail Scout Agent   ├─────►│  Support Queue  ├─────►│  Orchestrator     │
-│  (Finds new emails)  │      │ (FIFO Buffer)   │      │  (Processes items)│
-│                      │      │                 │      │                   │
-└──────────────────────┘      └─────────────────┘      └─────────┬─────────┘
-                                                                │
-                                           ┌────────────────────▼───────────────────┐
-                                           │                                        │
-                                           │  1. Use Triage Agent to make decision  │
-                                           │  2. Execute decision with Tools        │
-                                           │                                        │
-                                           └────────────────────┬───────────────────┘
-                                                                │
-                                     ┌──────────────────────────┴──────────────────────────┐
-                                     │                                                     │
-                             ┌───────▼───────┐                                     ┌───────▼───────┐
-                             │               │                                     │               │
-                             │ Jira Tool     │                                     │ Reply Tool    │
-                             │(Create Ticket)│                                     │(Send Email)   │
-                             │               │                                     │               │
-                             └───────────────┘                                     └───────────────┘
-```
+![Smart Customer Support Architecture](assets/architecture.png)
 
 ---
 
 ## 🚀 Features
 
--   **Agentic Workflow**: Utilizes specialized LangChain agents for distinct tasks: a `Scout Agent` for discovery and a `Triage Agent` for decision-making.
--   **Intelligent Triage**: The Triage Agent analyzes email content to determine priority (`High`, `Normal`) and the best action (`CREATE_TICKET` or `SEND_REPLY`).
--   **Tool-Based Execution**: The orchestrator uses specific, reliable tools to interact with external services like Jira and Gmail, ensuring predictable outcomes.
--   **AI-Generated Acknowledgments**: For ticket creation, a separate LLM call generates a context-aware, empathetic acknowledgment email for the customer.
--   **Scalable Queue System**: Built on an async queue, allowing the system to handle backpressure and be easily extended with new channels (e.g., Discord, Telegram).
+-   **Multi-Channel Support**: Monitors and responds to customer inquiries from **Gmail**, **Discord**, and **Telegram** simultaneously.
+-   **Agentic Workflow**: Utilizes specialized LangChain agents for distinct tasks: dedicated `Scout Agents` for each channel, a `Triage Agent` for decision-making, and a `Reply Agent` for generating responses.
+-   **Intelligent Triage**: The Triage Agent analyzes message content to determine priority (`High`, `Normal`, `Low`) and the best action (`CREATE_TICKET` or `SEND_REPLY`).
+-   **Tool-Based Execution**: The orchestrator uses specific, reliable tools to interact with external services like Jira, Gmail, Discord, and Telegram, ensuring predictable outcomes.
+-   **AI-Generated Responses**: A dedicated Reply Agent generates context-aware, empathetic, and platform-appropriate responses tailored to each communication channel.
+-   **Persistent Queue System**: Built on SQLite database queue (`customer_request.db`), allowing reliable message processing with status tracking (`PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`).
 -   **Robust Logging**: Logs all agent actions, orchestrator decisions, and errors to both the console and a persistent `app.log` file.
+-   **Async Architecture**: Fully asynchronous design with FastAPI lifespan events managing background tasks for optimal performance.
 
 ---
 
@@ -65,11 +44,14 @@ For tickets requiring a human touch, the system can even suggest a reply, which 
 
 -   **Backend**: Python, FastAPI, Uvicorn
 -   **Agent Framework**: LangChain, LangChain Agents
--   **AI / LLM**: Google Gemini 2.5 Flash (via `langchain-google-genai`)
+-   **AI / LLM**: 
+    -   **Groq** (Llama 3.3 70B) via `langchain-groq` for Triage and Reply Agents, Scout Agents
+-   **Database**: SQLite3 for persistent queue management
 -   **Integrations & Tools**:
-    -   **Gmail**: `langchain-google-community[gmail]` for the Scout Agent's tools.
-    -   **Jira**: `jira` library for the ticket creation tool.
-    -   **Discord**: `discord.py` for potential future channel integration.
+    -   **Gmail**: `langchain-google-community[gmail]` for email monitoring and sending
+    -   **Jira**: `jira` and `atlassian-python-api` libraries for ticket creation
+    -   **Discord**: `discord.py` for real-time channel monitoring
+    -   **Telegram**: `python-telegram-bot` for polling and message handling
 
 ---
 
@@ -86,7 +68,7 @@ cd smart-customer-support
 
 ```bash
 # Create a virtual environment
-python -m venv venv
+uv venv
 
 # Activate on Windows
 .\venv\Scripts\activate
@@ -98,7 +80,7 @@ source venv/bin/activate
 ### 3. Install Dependencies
 
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
 
 ### 4. Configure Credentials
@@ -106,6 +88,23 @@ pip install -r requirements.txt
 -   **Google API**:
     -   Follow the Google Cloud documentation to create an **OAuth 2.0 Client ID**.
     -   Download the `credentials.json` file and place it in the project's root directory.
+    -   Enable the Gmail API in your Google Cloud Console.
+
+-   **Groq API**:
+    -   Sign up at [Groq](https://groq.com/) and obtain an API key.
+
+-   **Jira Setup**:
+    -   Create a Jira Cloud account and project.
+    -   Generate an API token from your Atlassian account settings.
+
+-   **Discord Setup** (Optional):
+    -   Create a Discord bot in the [Discord Developer Portal](https://discord.com/developers/applications).
+    -   Add the bot to your server and copy the bot token and channel ID.
+
+-   **Telegram Setup** (Optional):
+    -   Create a bot using [@BotFather](https://t.me/botfather) on Telegram.
+    -   Copy the bot token provided.
+
 -   **Environment Variables**:
     -   Create a `.env` file in the root directory.
     -   Copy and paste the following, filling in your own secret values.
@@ -117,15 +116,25 @@ pip install -r requirements.txt
     GMAIL_CREDENTIALS_PATH=credentials.json
     GEMINI_API_KEY="your_gemini_api_key"
 
+    # Groq (Required for Triage and Reply Agents)
+    GROQ_API_KEY="your_groq_api_key"
+
     # Jira
     JIRA_API_TOKEN="your_jira_api_token"
     JIRA_EMAIL="your-jira-login-email@example.com"
     JIRA_DOMAIN="your-domain.atlassian.net"
     JIRA_PROJECT_KEY="YOUR_PROJECT_KEY"
 
-    # Discord (for future use)
+    # Discord (Optional)
     DISCORD_BOT_TOKEN="your_discord_bot_token"
     DISCORD_SUPPORT_CHANNEL_ID="your_discord_channel_id"
+
+    # Telegram (Optional)
+    TELEGRAM_BOT_TOKEN="your_telegram_bot_token"
+
+    # Logging (Optional)
+    LOG_LEVEL=INFO
+    LOG_FILE=app.log
     ```
 
 -   **Gmail Token**: A `token.json` file will be automatically created in the root directory the first time you run the application, after you complete the browser-based authentication flow.
@@ -142,6 +151,13 @@ uvicorn app.main:app --reload
 
 Once running, the application will:
 1.  Start the FastAPI server on `http://127.0.0.1:8000`.
-2.  Launch the background tasks for the `gmail_listener` and `orchestrator`.
-3.  Begin logging all activities to the console and `app.log`.
+2.  Initialize the SQLite database (`customer_request.db`).
+3.  Launch background tasks for:
+    -   Gmail Scout Agent (monitors inbox)
+    -   Discord Scout Agent (monitors channel)
+    -   Telegram Scout Agent (polls for updates)
+    -   Orchestrator (processes the ticket queue)
+4.  Begin logging all activities to the console and `app.log`.
+
+Visit `http://127.0.0.1:8000` to verify the service is running.
 
