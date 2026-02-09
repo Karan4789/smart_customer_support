@@ -5,7 +5,8 @@ project_root = os.path.join(os.path.dirname(__file__), '..', '..')
 dotenv_path = os.path.join(project_root, '.env')
 load_dotenv(dotenv_path=dotenv_path)
 
-GMAIL_CREDENTIALS_PATH = os.getenv('GMAIL_CREDENTIALS_PATH', 'credentials.json')
+GMAIL_CREDENTIALS_PATH = os.getenv('GMAIL_CREDENTIALS_PATH', 'secrets/credentials.json')
+GMAIL_TOKEN_PATH = os.getenv('GMAIL_TOKEN_PATH', 'secrets/token.json')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 

@@ -39,7 +39,7 @@ async def gmail_listener():
                 email_data = None
 
             if not email_data:
-                await asyncio.sleep(30)
+                await asyncio.sleep(120)
                 continue
 
             email_data['source'] = 'Gmail'
@@ -50,7 +50,7 @@ async def gmail_listener():
             except Exception as e:
                 if "UNIQUE constraint failed" in str(e):
                     logger.warning(f"[GMAIL LISTENER] Duplicate email found ({email_data.get('message_id')}). Skipping.")
-                    await asyncio.sleep(30)
+                    await asyncio.sleep(120)
                     continue
                 else:
                     raise e 
@@ -58,7 +58,7 @@ async def gmail_listener():
         except Exception as e:
             logger.critical(f"[GMAIL LISTENER] Error: {e}", exc_info=True)
         
-        await asyncio.sleep(30)
+        await asyncio.sleep(120)
 
 
 async def orchestrator_task():

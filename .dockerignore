@@ -1,0 +1,53 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.eggs/
+*.egg-info/
+*.egg
+
+# UV cache and lock (lock is copied separately)
+.uv/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs (will be mounted as volume)
+*.log
+app.log
+logs/
+
+# Secrets (mounted as volume)
+secrets/
+
+# Database (mounted as volume)
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Tests
+tests/
+.pytest_cache/
+
+# Docs
+README.md
+assets/
+
+# Docker files (no need to copy these into the image)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Sample files
+sample.txt

@@ -25,18 +25,16 @@ wheels/
 *.egg
 MANIFEST
 
-# PyInstaller
-*.manifest
-*.spec
-
 # Virtual environments
-.env
-.venv
-env/
+.venv/
 venv/
+env/
 ENV/
 env.bak/
 venv.bak/
+
+# UV
+.uv/
 
 # Environment variables
 .env
@@ -46,6 +44,7 @@ venv.bak/
 .env.production.local
 
 # Credentials and sensitive files
+secrets/
 credentials.json
 token.json
 *.pem
@@ -96,3 +95,11 @@ dmypy.json
 *.db
 *.sqlite
 *.sqlite3
+data/
+
+# Docker volumes (persisted data)
+logs/
+
+# Sample/test files
+sample.txt
+
