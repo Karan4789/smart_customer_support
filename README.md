@@ -1,163 +1,281 @@
-# Smart Customer Support Automation
+# 🤖 Smart Customer Support
 
-An **AI-powered, multi-agent application** that automates customer support workflows across **multiple channels**. This system uses dedicated **Scout Agents** to monitor Gmail, Discord, and Telegram, a **Triage Agent** to analyze and decide on actions, and an **Orchestrator** to execute tasks like creating Jira tickets or sending intelligent replies.
+An AI-powered multi-agent customer support system built with FastAPI and LangChain. It automatically processes customer complaints, triages issues, creates Jira tickets, and sends responses via Gmail, Discord, and Telegram.
 
-Built with **Python**, **FastAPI**, **LangChain**, and **Groq LLMs**, this project demonstrates a robust, scalable producer-consumer architecture for handling real-world support automation across diverse communication platforms.
+![Architecture](assets/architecture.png)
 
----
+## ✨ Features
 
-## 🏛️ Architecture
+- 📧 **Gmail Integration** - Automatically fetch and process customer emails
+- 🎯 **AI Triage** - Classify and prioritize issues using LLM
+- 🎫 **Jira Integration** - Auto-create tickets for tracked issues
+- 💬 **Discord Notifications** - Send alerts to support channels
+- 📱 **Telegram Bot** - Notify team via Telegram
+- 🤖 **Smart Replies** - Generate AI-powered email responses
+- 🐳 **Docker Ready** - Fully containerized for easy deployment
 
-The system uses a queue-based, multi-agent workflow to decouple tasks and ensure reliable processing across multiple communication channels.
+## 🏗️ Architecture
 
-![Smart Customer Support Architecture](assets/architecture.png)
+The system uses a multi-agent architecture:
 
----
+| Agent | Description |
+|-------|-------------|
+| **Scout Agents** | Fetches and monitors incoming complaints/request |
+| **Triage Agent** | Classifies priority and category of issues |
+| **Reply Agent** | Generates professional email responses |
 
-## 🚀 Features
 
--   **Multi-Channel Support**: Monitors and responds to customer inquiries from **Gmail**, **Discord**, and **Telegram** simultaneously.
--   **Agentic Workflow**: Utilizes specialized LangChain agents for distinct tasks: dedicated `Scout Agents` for each channel, a `Triage Agent` for decision-making, and a `Reply Agent` for generating responses.
--   **Intelligent Triage**: The Triage Agent analyzes message content to determine priority (`High`, `Normal`, `Low`) and the best action (`CREATE_TICKET` or `SEND_REPLY`).
--   **Tool-Based Execution**: The orchestrator uses specific, reliable tools to interact with external services like Jira, Gmail, Discord, and Telegram, ensuring predictable outcomes.
--   **AI-Generated Responses**: A dedicated Reply Agent generates context-aware, empathetic, and platform-appropriate responses tailored to each communication channel.
--   **Persistent Queue System**: Built on SQLite database queue (`customer_request.db`), allowing reliable message processing with status tracking (`PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`).
--   **Robust Logging**: Logs all agent actions, orchestrator decisions, and errors to both the console and a persistent `app.log` file.
--   **Async Architecture**: Fully asynchronous design with FastAPI lifespan events managing background tasks for optimal performance.
+## 📁 Project Structure
 
----
-
-## ✨ Showcase: Jira Integration
-
-The system identifies high-priority emails and automatically creates detailed tickets on the Jira board.
-![Jira Ticket Creation](assets/jira_op1.png)
-
-Each ticket contains the full context needed for a human agent to take over, including the original customer message.
-![Jira Ticket Details](assets/jira_op2.png)
-
-For tickets requiring a human touch, the system can even suggest a reply, which can be included in the ticket description.
-![Jira Ticket Details](assets/jira_op3.png)
-
----
-
-## 🛠 Tech Stack
-
--   **Backend**: Python, FastAPI, Uvicorn
--   **Agent Framework**: LangChain, LangChain Agents
--   **AI / LLM**: 
-    -   **Groq** (Llama 3.3 70B) via `langchain-groq` for Triage and Reply Agents, Scout Agents
--   **Database**: SQLite3 for persistent queue management
--   **Integrations & Tools**:
-    -   **Gmail**: `langchain-google-community[gmail]` for email monitoring and sending
-    -   **Jira**: `jira` and `atlassian-python-api` libraries for ticket creation
-    -   **Discord**: `discord.py` for real-time channel monitoring
-    -   **Telegram**: `python-telegram-bot` for polling and message handling
-
----
-
-## 📦 Setup and Installation
-
-### 1. Clone the Repository
-
-```bash
-git clone <your-repository-url>
-cd smart-customer-support
+```
+smart_customer_support/
+├── app/
+│   ├── agents/
+│   │   ├── tools/
+│   │   │   ├── discord_tools.py
+│   │   │   ├── jira_tools.py
+│   │   │   ├── reply_tools.py
+│   │   │   └── telegram_tools.py
+│   │   ├── discord_agent.py
+│   │   ├── gmail_agent.py
+│   │   ├── reply_agent.py
+│   │   ├── telegram_agent.py
+│   │   └── triage_agent.py
+│   ├── api/
+│   │   └── email_handler.py
+│   ├── config/
+│   │   └── config.py
+│   ├── services/
+│   │   ├── discord_service.py
+│   │   ├── gmail_service.py
+│   │   ├── jira_service.py
+│   │   └── telegram_service.py
+│   ├── utils/
+│   │   ├── jsonextract.py
+│   │   └── logger.py
+│   ├── background.py
+│   ├── database.py
+│   └── main.py
+├── secrets/
+│   ├── credentials.json
+│   └── token.json
+├── data/
+├── .env
+├── .gitignore
+├── .dockerignore
+├── Dockerfile
+├── docker-compose.yml
+├── pyproject.toml
+└── README.md
 ```
 
-### 2. Create and Activate a Virtual Environment
+## 🚀 Getting Started
 
-```bash
-# Create a virtual environment
-uv venv
+### Prerequisites
 
-# Activate on Windows
-.\venv\Scripts\activate
+- Python 3.12+
+- [UV](https://github.com/astral-sh/uv) package manager
+- Docker & Docker Compose (for containerized setup)
+- Gmail API credentials
+- Jira API token
+- Discord Bot token
+- Telegram Bot token
 
-# Activate on macOS/Linux
-source venv/bin/activate
+### Installation
+
+#### Option 1: Local Development
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/smart_customer_support.git
+   cd smart_customer_support
+   ```
+
+2. **Install UV** (if not already installed)
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+
+3. **Create and Activate a Virtual Environment**
+   ```bash
+   # Create a virtual environment
+   uv venv
+
+   # Activate on Windows
+   .\venv\Scripts\activate
+
+   # Activate on macOS/Linux
+   source venv/bin/activate
+   ```
+
+4. **Install dependencies**
+   ```bash
+   uv sync
+   ```
+
+5. **Set up environment variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your API keys
+   ```
+   or Create a .env file in the root directory.
+
+6. **Set up Gmail OAuth credentials**
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create OAuth 2.0 credentials
+   - Download `credentials.json` and place in `secrets/` folder
+   - Run the app once locally to generate `token.json`
+
+7. **Run the application**
+   ```bash
+   uv run uvicorn app.main:app --reload
+   ```
+
+#### Option 2: Docker (Recommended for Production)
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/smart_customer_support.git
+   cd smart_customer_support
+   ```
+
+2. **Set up environment variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your API keys
+   ```
+
+3. **Set up Gmail credentials**
+   ```bash
+   mkdir secrets
+   # Add credentials.json and token.json to secrets/
+   ```
+
+4. **Create required directories**
+   ```bash
+   mkdir data
+   touch app.log
+   ```
+
+5. **Build and run with Docker**
+   ```bash
+   docker-compose up --build -d
+   ```
+
+6. **View logs**
+   ```bash
+   docker-compose logs -f
+   ```
+
+## ⚙️ Environment Variables
+
+Create a `.env` file in the root directory:
+
+```env
+# LLM API Keys
+GROQ_API_KEY=your_groq_api_key
+GEMINI_API_KEY=your_gemini_api_key
+
+# Gmail OAuth (paths relative to project root)
+GMAIL_CREDENTIALS_PATH=secrets/credentials.json
+GMAIL_TOKEN_PATH=secrets/token.json
+
+# Jira Configuration
+JIRA_API_TOKEN=your_jira_api_token
+JIRA_EMAIL=your_jira_email
+JIRA_DOMAIN=your_domain.atlassian.net
+JIRA_PROJECT_KEY=PROJECT
+
+# Discord Configuration
+DISCORD_BOT_TOKEN=your_discord_bot_token
+DISCORD_SUPPORT_CHANNEL_ID=your_channel_id
+
+# Telegram Configuration
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+
+# Logging
+LOG_LEVEL=INFO
+LOG_FILE=app.log
 ```
 
-### 3. Install Dependencies
+## 🐳 Docker Commands
 
 ```bash
-uv sync
+# Build and start
+docker-compose up --build -d
+
+# View logs
+docker-compose logs -f
+
+# Stop containers
+docker-compose down
+
+# Restart
+docker-compose restart
+
+# Enter container shell
+docker exec -it smart-customer-support /bin/bash
+
+# View app logs inside container
+docker exec -it smart-customer-support cat app.log
 ```
 
-### 4. Configure Credentials
+## 🔧 Configuration
 
--   **Google API**:
-    -   Follow the Google Cloud documentation to create an **OAuth 2.0 Client ID**.
-    -   Download the `credentials.json` file and place it in the project's root directory.
-    -   Enable the Gmail API in your Google Cloud Console.
+### Gmail OAuth Setup
 
--   **Groq API**:
-    -   Sign up at [Groq](https://groq.com/) and obtain an API key.
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing
+3. Enable Gmail API
+4. Create OAuth 2.0 credentials (Desktop App)
+5. Download JSON and save as `secrets/credentials.json`
+6. Run locally first to complete OAuth flow and generate `token.json`
 
--   **Jira Setup**:
-    -   Create a Jira Cloud account and project.
-    -   Generate an API token from your Atlassian account settings.
+### Jira Setup
 
--   **Discord Setup** (Optional):
-    -   Create a Discord bot in the [Discord Developer Portal](https://discord.com/developers/applications).
-    -   Add the bot to your server and copy the bot token and channel ID.
+1. Generate API token at [Atlassian Account](https://id.atlassian.com/manage-profile/security/api-tokens)
+2. Add token, email, and domain to `.env`
 
--   **Telegram Setup** (Optional):
-    -   Create a bot using [@BotFather](https://t.me/botfather) on Telegram.
-    -   Copy the bot token provided.
+### Discord Setup
 
--   **Environment Variables**:
-    -   Create a `.env` file in the root directory.
-    -   Copy and paste the following, filling in your own secret values.
+1. Create bot at [Discord Developer Portal](https://discord.com/developers/applications)
+2. Get bot token and channel ID
+3. Add to `.env`
 
-    ```env
-    # .env
+### Telegram Setup
 
-    # Google
-    GMAIL_CREDENTIALS_PATH=credentials.json
-    GEMINI_API_KEY="your_gemini_api_key"
+1. Create bot via [@BotFather](https://t.me/botfather)
+2. Get bot token
+3. Add to `.env`
 
-    # Groq (Required for Triage and Reply Agents)
-    GROQ_API_KEY="your_groq_api_key"
 
-    # Jira
-    JIRA_API_TOKEN="your_jira_api_token"
-    JIRA_EMAIL="your-jira-login-email@example.com"
-    JIRA_DOMAIN="your-domain.atlassian.net"
-    JIRA_PROJECT_KEY="YOUR_PROJECT_KEY"
+## 📝 Logging
 
-    # Discord (Optional)
-    DISCORD_BOT_TOKEN="your_discord_bot_token"
-    DISCORD_SUPPORT_CHANNEL_ID="your_discord_channel_id"
-
-    # Telegram (Optional)
-    TELEGRAM_BOT_TOKEN="your_telegram_bot_token"
-
-    # Logging (Optional)
-    LOG_LEVEL=INFO
-    LOG_FILE=app.log
-    ```
-
--   **Gmail Token**: A `token.json` file will be automatically created in the root directory the first time you run the application, after you complete the browser-based authentication flow.
-
----
-
-## ▶️ Running the Application
-
-Start the FastAPI server with Uvicorn. The `--reload` flag will automatically restart the server when you make code changes.
+Logs are written to `app.log` in the root directory. In Docker, this file is persisted via volume mount.
 
 ```bash
-uvicorn app.main:app --reload
+# View logs locally
+cat app.log
+
+# View logs in Docker
+docker exec -it smart-customer-support cat app.log
+
+# Tail logs
+tail -f app.log
 ```
 
-Once running, the application will:
-1.  Start the FastAPI server on `http://127.0.0.1:8000`.
-2.  Initialize the SQLite database (`customer_request.db`).
-3.  Launch background tasks for:
-    -   Gmail Scout Agent (monitors inbox)
-    -   Discord Scout Agent (monitors channel)
-    -   Telegram Scout Agent (polls for updates)
-    -   Orchestrator (processes the ticket queue)
-4.  Begin logging all activities to the console and `app.log`.
+## 🤝 Contributing
 
-Visit `http://127.0.0.1:8000` to verify the service is running.
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 🙏 Acknowledgments
+
+- [LangChain](https://langchain.com/) - LLM framework
+- [FastAPI](https://fastapi.tiangolo.com/) - Web framework
+- [UV](https://github.com/astral-sh/uv) - Package manager
+- [Groq](https://groq.com/) - LLM inference
 
