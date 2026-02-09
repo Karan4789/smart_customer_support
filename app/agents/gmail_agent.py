@@ -3,7 +3,7 @@
 import os
 from dotenv import load_dotenv
 from langchain.agents import AgentExecutor, create_openai_tools_agent
-# from langchain_google_genai import ChatGoogleGenerativeAI
+from app.config import config
 from langchain_groq import ChatGroq
 from langchain_google_community import GmailToolkit
 from langchain import hub
@@ -19,7 +19,7 @@ logger = setup_logging()
 # --- 1. Initial Setup ---
 
 load_dotenv()
-groq_api_key = os.getenv("GROQ_API_KEY")
+groq_api_key = config.GROQ_API_KEY
 if not groq_api_key:
     raise ValueError("❌ GROQ_API_KEY not found in .env file.")
 
@@ -29,8 +29,8 @@ logger.info("🚀 Initializing LLM with GROQ_API_KEY...")
 llm = ChatGroq(model="qwen/qwen3-32b", temperature=0, api_key=groq_api_key)
 
 # --- 2. Configure Gmail Authentication ---
-credentials_file = os.getenv("GMAIL_CREDENTIALS_PATH", "credentials.json")
-token_file = "token.json"
+credentials_file = config.GMAIL_CREDENTIALS_PATH
+token_file = config.GMAIL_TOKEN_PATH
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/gmail.send",

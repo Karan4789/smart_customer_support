@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  smart-support:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: smart-customer-support
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persist SQLite database
+      - ./data:/app/data
+      # Mount secrets folder (credentials.json & token.json)
+      - ./secrets:/app/secrets:rw
+      # Persist logs (app.log on root)
+      - ./app.log:/app/app.log
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - GMAIL_CREDENTIALS_PATH=secrets/credentials.json
+      - GMAIL_TOKEN_PATH=secrets/token.json
+    restart: unless-stopped

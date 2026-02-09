@@ -2,7 +2,7 @@ import sqlite3
 import json
 from datetime import datetime
 
-DB_NAME = "customer_request.db"
+DB_NAME = "data/customer_request.db"
 
 def init_db():
     """Creates the tickets table if it doesn't exist."""
