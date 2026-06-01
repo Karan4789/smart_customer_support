@@ -18,12 +18,11 @@ An AI-powered multi-agent customer support system built with FastAPI and LangCha
 
 The system uses a multi-agent architecture:
 
-| Agent | Description |
-|-------|-------------|
+| Agent                  | Description                                      |
+| ---------------------- | ------------------------------------------------ |
 | **Scout Agents** | Fetches and monitors incoming complaints/request |
-| **Triage Agent** | Classifies priority and category of issues |
-| **Reply Agent** | Generates professional email responses |
-
+| **Triage Agent** | Classifies priority and category of issues       |
+| **Reply Agent**  | Generates professional email responses           |
 
 ## 📁 Project Structure
 
@@ -86,17 +85,18 @@ smart_customer_support/
 #### Option 1: Local Development
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/yourusername/smart_customer_support.git
    cd smart_customer_support
    ```
-
 2. **Install UV** (if not already installed)
+
    ```bash
    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
-
 3. **Create and Activate a Virtual Environment**
+
    ```bash
    # Create a virtual environment
    uv venv
@@ -107,26 +107,27 @@ smart_customer_support/
    # Activate on macOS/Linux
    source venv/bin/activate
    ```
-
 4. **Install dependencies**
+
    ```bash
    uv sync
    ```
-
 5. **Set up environment variables**
+
    ```bash
    cp .env.example .env
    # Edit .env with your API keys
    ```
-   or Create a .env file in the root directory.
 
+   or Create a .env file in the root directory.
 6. **Set up Gmail OAuth credentials**
+
    - Go to [Google Cloud Console](https://console.cloud.google.com/)
    - Create OAuth 2.0 credentials
    - Download `credentials.json` and place in `secrets/` folder
    - Run the app once locally to generate `token.json`
-
 7. **Run the application**
+
    ```bash
    uv run uvicorn app.main:app --reload
    ```
@@ -134,35 +135,36 @@ smart_customer_support/
 #### Option 2: Docker (Recommended for Production)
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/yourusername/smart_customer_support.git
    cd smart_customer_support
    ```
-
 2. **Set up environment variables**
+
    ```bash
    cp .env.example .env
    # Edit .env with your API keys
    ```
-
 3. **Set up Gmail credentials**
+
    ```bash
    mkdir secrets
    # Add credentials.json and token.json to secrets/
    ```
-
 4. **Create required directories**
+
    ```bash
    mkdir data
    touch app.log
    ```
-
 5. **Build and run with Docker**
+
    ```bash
    docker-compose up --build -d
    ```
-
 6. **View logs**
+
    ```bash
    docker-compose logs -f
    ```
@@ -248,7 +250,6 @@ docker exec -it smart-customer-support cat app.log
 2. Get bot token
 3. Add to `.env`
 
-
 ## 📝 Logging
 
 Logs are written to `app.log` in the root directory. In Docker, this file is persisted via volume mount.
@@ -278,4 +279,3 @@ tail -f app.log
 - [FastAPI](https://fastapi.tiangolo.com/) - Web framework
 - [UV](https://github.com/astral-sh/uv) - Package manager
 - [Groq](https://groq.com/) - LLM inference
-
